@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v6 (Heat Manager)</title>
+    <title>Swim Announcer Ultimate v7 (Debug Mode)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -10,8 +10,7 @@
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* SIDEBAR */
-        .sidebar { width: 340px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .sidebar { width: 360px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 20px; background: #020617; border-bottom: 1px solid #1e293b; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
@@ -25,33 +24,31 @@
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
         input[type="file"] { display: none; }
 
-        /* TABS */
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
         .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
         .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
 
-        /* ACTION AREA */
         .action-area { padding: 20px; background: #020617; border-top: 1px solid #1e293b; }
         .btn-gen { width: 100%; background: var(--accent); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-gen:hover { background: #2563eb; }
         .btn-gen:disabled { background: #334155; cursor: not-allowed; opacity: 0.7; }
         .btn-gen.dirty { background: var(--orange); animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+        
+        .btn-parse { background: #334155; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .btn-parse:hover { background: #475569; }
 
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
-        /* MAIN DASHBOARD */
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; }
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .status { font-weight: bold; font-size: 0.9rem; color: #64748b; }
         .status.ready { color: var(--green); }
         .status.working { color: var(--accent); }
+        .status.error { color: var(--red); }
 
-        /* HEAT MANAGER LIST */
         .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; }
         
-        /* Heat Container */
         .heat-block { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e2e8f0; overflow: hidden; }
         .heat-header { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
         .heat-header:hover { background: #f1f5f9; }
@@ -59,17 +56,14 @@
         .heat-title { font-weight: 800; font-size: 1.1rem; color: #475569; }
         .heat-badge { font-size: 0.75rem; background: #e2e8f0; padding: 2px 8px; border-radius: 10px; color: #64748b; }
 
-        /* Swimmer Rows */
         .swimmer-row { display: flex; align-items: center; padding: 10px 20px; border-bottom: 1px solid #f1f5f9; transition: 0.1s; background: white; }
         .swimmer-row:last-child { border-bottom: none; }
         .swimmer-row:hover { background: #f8fafc; }
         .swimmer-row.active { background: #eff6ff; border-left: 4px solid var(--accent); padding-left: 16px; }
         .swimmer-row.dragging { opacity: 0.5; background: #e2e8f0; border: 2px dashed #94a3b8; }
-        
         .swimmer-row.scratched { background: #f8fafc; opacity: 0.6; }
         .swimmer-row.scratched .name-text { text-decoration: line-through; color: #94a3b8; }
 
-        /* Columns */
         .col-lane { width: 50px; font-weight: 800; font-size: 1.2rem; color: #cbd5e1; text-align: center; cursor: grab; }
         .col-info { flex: 1; padding: 0 15px; }
         .name-text { font-weight: 700; color: #334155; font-size: 1.05rem; cursor: text; border-bottom: 1px dashed transparent; }
@@ -77,11 +71,9 @@
         .team-text { font-size: 0.85rem; color: #64748b; margin-top: 2px; }
         .col-time { font-family: monospace; font-size: 0.85rem; color: #94a3b8; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; margin-right: 15px; }
         
-        /* Actions */
         .btn-scratch { padding: 4px 8px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #e2e8f0; background: white; color: #94a3b8; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .btn-scratch:hover { border-color: var(--red); color: var(--red); background: #fef2f2; }
         .btn-scratch.active { background: var(--red); color: white; border-color: var(--red); }
-
         .audio-dot { width: 8px; height: 8px; border-radius: 50%; background: #e2e8f0; margin-left: 15px; }
         .has-audio .audio-dot { background: var(--green); box-shadow: 0 0 4px var(--green); }
 
@@ -91,7 +83,7 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate v6</h2>
+        <h2>🏊 Ultimate v7 (Debug)</h2>
     </div>
     
     <div class="scroll-area">
@@ -116,9 +108,6 @@
                 <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
             </div>
             <textarea id="templateInput" style="height:80px;" oninput="markDirty()">In lane {lane}, from {team}, {name}.</textarea>
-            <div style="font-size:0.7rem; color:#64748b; margin-top:5px;">
-                Vars: <span style="color:var(--accent)">{lane} {team} {name} {time}</span>
-            </div>
         </div>
 
         <div>
@@ -131,7 +120,12 @@
             </textarea>
         </div>
         
-        <textarea id="dataInput" style="display:none;"></textarea>
+        <div>
+            <label style="color:var(--orange);">⚠️ RAW DATA (DEBUG)</label>
+            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">If empty after upload, PDF is unreadable. If text exists, edit and click Parse.</div>
+            <textarea id="dataInput" style="height:150px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text will appear here..."></textarea>
+            <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
+        </div>
     </div>
 
     <div class="action-area">
@@ -158,56 +152,40 @@
             <span id="statusText" class="status">Waiting for PDF...</span>
         </div>
         <div style="font-size: 0.85rem; color: #64748b;">
-            <b>Space:</b> Play Selected &nbsp;|&nbsp; <b>Click Name:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
+            <b>Space:</b> Play &nbsp;|&nbsp; <b>Click Name:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
         </div>
     </div>
 
     <div class="list-container" id="listContainer">
         <div style="text-align:center; color:#94a3b8; margin-top:100px;">
             <h3>Welcome to Heat Manager</h3>
-            <p>Upload a PDF to visualize heats here.</p>
+            <p>Upload a PDF. If nothing appears, check the "Raw Data" box.</p>
         </div>
     </div>
 </div>
 
 <script>
-    // --- STATE ---
-    let heats = {}; // Object: { "1": [swimmer, swimmer], "2": [...] }
-    let heatOrder = []; // Array: ["1", "2"] to keep sort order
-    let audioCache = {}; // Map: "heat_lane" -> Audio
-    let currentSelection = { heat: null, index: -1 }; // Pointer
+    let heats = {}; 
+    let heatOrder = []; 
+    let audioCache = {}; 
+    let currentSelection = { heat: null, index: -1 }; 
     
-    // --- INIT ---
     window.onload = () => {
         if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
         loadTemplateUI();
-        
-        // Keep Awake
-        document.addEventListener('click', async () => {
-            if ('wakeLock' in navigator && !window.wakeLockObj) {
-                try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){}
-            }
-        }, {once: true});
+        document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
-    function saveConfig() {
-        localStorage.setItem('openai_key', document.getElementById('apiKey').value);
-        localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value);
-    }
-    
-    // --- TEMPLATE LOGIC ---
+    function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
     const defaultTemplates = { 1: "In lane {lane}, representing {team}, {name}.", 2: "Winner in lane {lane}, {name}, with a time of {time}." };
     let currentTab = 1;
     function switchTab(t) { currentTab=t; loadTemplateUI(); markDirty(); document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', i+1===t)); }
     function loadTemplateUI() { document.getElementById('templateInput').value = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab]; }
-    function markDirty() { 
-        const btn = document.getElementById('btnGenerate');
-        btn.classList.add('dirty');
-        btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>";
-    }
+    function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
+    function setStatus(msg, type) { const el = document.getElementById('statusText'); el.innerText = msg; el.className = 'status '+type; }
 
-    // --- PDF ENGINE ---
+    // --- PDF ENGINE (LOOSE MODE) ---
     async function handlePdfUpload(input) {
         if (!input.files[0]) return;
         setStatus("Reading PDF...", "working");
@@ -215,15 +193,13 @@
         try {
             const arrayBuffer = await input.files[0].arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-            
-            let parsedData = [];
+            let fullText = "";
             
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
                 const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
                 
-                // Simple Line grouper
                 let lines = [], currentLine = [], lastY = items[0]?.y || 0;
                 items.forEach(d => {
                     if (Math.abs(d.y - lastY) > 5) {
@@ -233,53 +209,83 @@
                     currentLine.push(d);
                 });
                 if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
-
-                // Parser
-                let currentHeat = null;
-                lines.forEach(line => {
-                    line = line.trim();
-                    const hMatch = line.match(/Heat\s+(\d+)\s+of/i);
-                    if(hMatch) currentHeat = hMatch[1];
-                    if(line.includes("Alternates")) currentHeat = null;
-                    
-                    if(currentHeat) {
-                        const m = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
-                        if(m) parsedData.push({ heat: currentHeat, name: m[1].trim(), lane: m[2], team: m[3].trim(), time: m[4] });
-                    }
-                });
+                
+                fullText += lines.join("\n") + "\n";
             }
             
-            // Transform to State
-            heats = {}; heatOrder = [];
-            parsedData.forEach(s => {
-                if(!heats[s.heat]) { heats[s.heat] = []; heatOrder.push(s.heat); }
-                heats[s.heat].push({ ...s, scratched: false, id: `s_${s.heat}_${s.lane}` });
-            });
+            // DUMP TO RAW BOX
+            document.getElementById('dataInput').value = fullText;
             
-            // Sort Heats numerically if possible
-            heatOrder.sort((a,b) => parseInt(a)-parseInt(b));
+            // ATTEMPT AUTO PARSE
+            const count = manualParse(true); 
             
-            renderBoard();
-            setStatus(`Loaded ${parsedData.length} swimmers across ${heatOrder.length} heats.`, "ready");
+            if(count === 0) {
+                setStatus("Auto-parse failed. Check Raw Data box.", "error");
+                alert("I couldn't find any swimmers automatically. Please check the 'Raw Data' box on the left to see what the PDF looks like.");
+            } else {
+                setStatus(`Found ${count} swimmers.`, "ready");
+            }
 
-        } catch(e) { console.error(e); alert("PDF Error. Check console."); }
+        } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- RENDER BOARD (HEAT MANAGER) ---
+    // --- PARSER ---
+    function manualParse(silent = false) {
+        const raw = document.getElementById('dataInput').value;
+        const lines = raw.split('\n');
+        let parsedData = [];
+        let currentHeat = null;
+
+        lines.forEach(line => {
+            line = line.trim();
+            // HEAT DETECTION
+            const hMatch = line.match(/Heat\s+(\d+)/i);
+            if(hMatch) currentHeat = hMatch[1];
+            if(line.includes("Alternates")) currentHeat = null;
+
+            if(currentHeat) {
+                // LOOSE MATCHING: Look for "Lane Digit" + "Time"
+                // Regex: Name (start), Lane (digit 1-2), Age (digit), Team (text), Time (decimal)
+                const m = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
+                if(m) {
+                    parsedData.push({ heat: currentHeat, name: m[1].trim(), lane: m[2], team: m[3].trim(), time: m[4] });
+                }
+            }
+        });
+        
+        if (parsedData.length === 0 && !silent) {
+            alert("Parser found 0 swimmers. Ensure format is: Name Lane Age Team Time");
+            return 0;
+        }
+
+        heats = {}; heatOrder = [];
+        parsedData.forEach(s => {
+            if(!heats[s.heat]) { heats[s.heat] = []; heatOrder.push(s.heat); }
+            heats[s.heat].push({ ...s, scratched: false, id: `s_${s.heat}_${s.lane}` });
+        });
+        heatOrder.sort((a,b) => parseInt(a)-parseInt(b));
+        
+        renderBoard();
+        return parsedData.length;
+    }
+
+    // --- RENDER BOARD ---
     function renderBoard() {
         const container = document.getElementById('listContainer');
         container.innerHTML = "";
         
+        if (heatOrder.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Check the Raw Data box on the left.</p></div>`;
+            return;
+        }
+        
         heatOrder.forEach(heatKey => {
             const swimmers = heats[heatKey];
-            
-            // Sort swimmers by Lane
             swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
 
             const heatBlock = document.createElement('div');
             heatBlock.className = 'heat-block';
             
-            // Header
             const header = document.createElement('div');
             header.className = 'heat-header';
             header.innerHTML = `<div class="heat-title">HEAT ${heatKey}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
@@ -288,17 +294,15 @@
             
             heatBlock.appendChild(header);
 
-            // Swimmer Rows
             swimmers.forEach((s, idx) => {
                 const row = document.createElement('div');
                 row.className = `swimmer-row ${s.scratched ? 'scratched' : ''}`;
                 if(currentSelection.heat === heatKey && currentSelection.index === idx) row.classList.add('active');
                 if(audioCache[s.id]) row.classList.add('has-audio');
                 
-                // Drag Events
                 row.draggable = true;
                 row.ondragstart = (e) => dragStart(e, heatKey, idx);
-                row.ondragover = (e) => e.preventDefault(); // Allow drop
+                row.ondragover = (e) => e.preventDefault(); 
                 row.ondrop = (e) => drop(e, heatKey, idx);
 
                 row.innerHTML = `
@@ -315,138 +319,64 @@
                 row.onclick = (e) => { 
                     if(!e.target.isContentEditable && e.target.tagName !== 'BUTTON') selectSwimmer(heatKey, idx); 
                 };
-                
                 heatBlock.appendChild(row);
             });
-            
             container.appendChild(heatBlock);
         });
     }
 
-    // --- DRAG AND DROP LOGIC ---
     let dragSrc = null;
-
-    function dragStart(e, heat, index) {
-        dragSrc = { heat, index };
-        e.target.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-    }
-
+    function dragStart(e, heat, index) { dragSrc = { heat, index }; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
     function drop(e, targetHeat, targetIndex) {
         e.preventDefault();
         if(!dragSrc) return;
-        
-        // 1. Get Source Data
         const srcList = heats[dragSrc.heat];
         const swimmer = srcList[dragSrc.index];
-        
-        // 2. Remove from Source
         srcList.splice(dragSrc.index, 1);
-        
-        // 3. Update Swimmer Lane to match Target's visual position (optional, or just insert)
-        // Note: In swim, dropping on Lane 5 usually means you TAKE Lane 5.
-        // For simplicity, we just insert into the array and let user edit Lane number if needed.
-        // Better: Swap Lane Numbers.
         
         const targetList = heats[targetHeat];
         const targetSwimmer = targetList[targetIndex];
+        swimmer.lane = targetSwimmer.lane; 
         
-        // Swap Lane Numbers
-        const tempLane = swimmer.lane;
-        swimmer.lane = targetSwimmer.lane;
-        // If we want to swap positions completely:
-        // targetSwimmer.lane = tempLane; // Only if swapping
-        
-        // Insert into Target
-        // Logic: If same heat, just re-sort. If diff heat, push.
-        if (dragSrc.heat === targetHeat) {
-             // If moving within same heat, we need to handle the index shift
-             if (targetIndex > dragSrc.index) targetIndex--; 
-        }
-        
+        if (dragSrc.heat === targetHeat && targetIndex > dragSrc.index) targetIndex--; 
         targetList.splice(targetIndex, 0, swimmer);
         
-        // Cleanup
         if(srcList.length === 0) delete heats[dragSrc.heat];
-        
         dragSrc = null;
-        markDirty(); // Lanes changed, audio invalid!
-        renderBoard();
+        markDirty(); renderBoard();
     }
 
-    // --- DATA UPDATES ---
-    function updateData(heat, idx, field, el) {
-        heats[heat][idx][field] = el.innerText;
-        markDirty(); // Name changed, audio invalid
-    }
+    function updateData(heat, idx, field, el) { heats[heat][idx][field] = el.innerText; markDirty(); }
+    function toggleScratch(heat, idx) { heats[heat][idx].scratched = !heats[heat][idx].scratched; renderBoard(); }
+    function selectSwimmer(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); playCurrent(); }
 
-    function toggleScratch(heat, idx) {
-        heats[heat][idx].scratched = !heats[heat][idx].scratched;
-        renderBoard();
-    }
-
-    function selectSwimmer(heat, idx) {
-        currentSelection = { heat, index: idx };
-        renderBoard(); // To update active class
-        playCurrent();
-    }
-
-    function setStatus(msg, type) {
-        const el = document.getElementById('statusText');
-        el.innerText = msg; el.className = 'status '+type;
-    }
-
-    // --- AUDIO GENERATION ---
     async function generateAudio() {
         const key = document.getElementById('apiKey').value;
         if(!key.startsWith('sk-')) { alert("Missing API Key"); return; }
         
         const btn = document.getElementById('btnGenerate');
-        btn.classList.remove('dirty');
-        btn.disabled = true;
-        btn.innerText = "GENERATING...";
+        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
         
         const template = document.getElementById('templateInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
         
-        audioCache = {}; // Clear old
-        let total = 0;
-        Object.values(heats).forEach(list => total += list.length);
-        let count = 0;
+        audioCache = {}; 
+        let total = 0; Object.values(heats).forEach(list => total += list.length); let count = 0;
 
-        // Flatten loop
         for (const heatKey of heatOrder) {
-            // Heat Intro Audio
             const hId = `h_${heatKey}`;
-            try {
-                const res = await fetchAI(`Now swimming heat ${heatKey}.`, voice, key);
-                if(res) audioCache[hId] = res;
-            } catch(e) {}
+            try { const res = await fetchAI(`Now swimming heat ${heatKey}.`, voice, key); if(res) audioCache[hId] = res; } catch(e) {}
 
             for (const s of heats[heatKey]) {
                 if(s.scratched) continue;
-                
-                // Text Proc
                 let txt = template.replace(/{lane}/g, s.lane).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
-                // Phonetics
                 for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                
-                // Fetch
-                try {
-                    const res = await fetchAI(txt, voice, key);
-                    if(res) audioCache[s.id] = res;
-                } catch(e) {}
-                
-                count++;
-                document.getElementById('progressFill').style.width = (count/total*100)+"%";
+                try { const res = await fetchAI(txt, voice, key); if(res) audioCache[s.id] = res; } catch(e) {}
+                count++; document.getElementById('progressFill').style.width = (count/total*100)+"%";
             }
         }
-        
-        btn.disabled = false;
-        btn.innerText = "⚡ GENERATE AUDIO";
-        setStatus("Audio Ready.", "ready");
-        renderBoard();
+        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
     async function fetchAI(text, voice, key) {
@@ -458,74 +388,40 @@
         return null;
     }
 
-    // --- PLAYBACK ---
     function playHeatIntro(heat) {
-        currentSelection = { heat: heat, index: -1 };
-        renderBoard();
+        currentSelection = { heat: heat, index: -1 }; renderBoard();
         const aud = audioCache[`h_${heat}`];
         if(aud) { aud.currentTime=0; aud.play(); setStatus(`Announcing Heat ${heat}...`, "working"); }
     }
-
     function playCurrent() {
         const { heat, index } = currentSelection;
         if(index === -1) { playHeatIntro(heat); return; }
-        
         const s = heats[heat][index];
         if(s.scratched) return;
-        
         const aud = audioCache[s.id];
-        if(aud) { 
-            aud.currentTime=0; aud.play(); 
-            setStatus(`Announcing Lane ${s.lane}...`, "working"); 
-        } else {
-            setStatus("Audio not generated yet.", "working");
-        }
+        if(aud) { aud.currentTime=0; aud.play(); setStatus(`Announcing Lane ${s.lane}...`, "working"); } else { setStatus("Audio not generated yet.", "working"); }
     }
 
-    // --- NAVIGATION ---
     document.addEventListener('keydown', (e) => {
         if(!heats || Object.keys(heats).length === 0) return;
-        
-        if(e.code === 'Space') { 
-            e.preventDefault(); 
-            playCurrent(); 
-        } 
-        else if(e.code === 'ArrowDown') {
-            e.preventDefault();
-            navigate(1);
-        }
-        else if(e.code === 'ArrowUp') {
-            e.preventDefault();
-            navigate(-1);
-        }
+        if(e.code === 'Space') { e.preventDefault(); playCurrent(); } 
+        else if(e.code === 'ArrowDown') navigate(1);
+        else if(e.code === 'ArrowUp') navigate(-1);
     });
 
     function navigate(dir) {
-        // Logic to move between (Heat Header) -> (Swimmer 0) -> (Swimmer 1) -> (Next Heat Header)
-        // Flatten list logic
         let flatMap = [];
         heatOrder.forEach(h => {
-            flatMap.push({ heat: h, index: -1 }); // Header
-            heats[h].forEach((s, i) => {
-                if(!s.scratched) flatMap.push({ heat: h, index: i });
-            });
+            flatMap.push({ heat: h, index: -1 }); 
+            heats[h].forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
         });
-
-        // Find current pos in flatMap
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
-        
-        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; // Start
-        else currIdx += dir;
-        
+        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
         if(currIdx >= 0 && currIdx < flatMap.length) {
-            currentSelection = flatMap[currIdx];
-            renderBoard();
-            // Scroll into view
-            const el = document.querySelector('.active');
-            if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+            currentSelection = flatMap[currIdx]; renderBoard();
+            const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
         }
     }
-
 </script>
 </body>
 </html>
