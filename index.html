@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v15 (Turbo)</title>
+    <title>Swim Announcer Ultimate v16 (Event Names)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -160,6 +160,9 @@
                     <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
                 </div>
                 <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
+                <div style="font-size:0.65rem; color:#64748b; margin-top:5px; line-height:1.4;">
+                    Vars: <span style="color:var(--accent)">{event} {event_name} {heat} {lane} {age} {team} {name} {time}</span>
+                </div>
             </div>
 
             <div>
@@ -209,7 +212,7 @@
     <div class="action-area">
         <label class="checkbox-row" style="margin-bottom:10px;">
             <input type="checkbox" id="forceRegen">
-            <span>Force Re-Generate All</span>
+            <span>Force Re-Gen</span>
         </label>
         
         <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
@@ -365,12 +368,27 @@
         const lines = raw.split('\n');
         let parsedData = [];
         let currentEvent = "Unknown";
+        let currentEventName = "";
         let currentHeat = null;
 
         lines.forEach(line => {
             line = line.trim();
-            const evtMatch = line.match(/Event\s+(\d+)/i);
-            if(evtMatch) currentEvent = evtMatch[1];
+            
+            // Event Match: Look for "Event 101 Girls 50 Free..."
+            const evtMatch = line.match(/Event\s+(\d+)\s+(.*)/i);
+            if(evtMatch) {
+                currentEvent = evtMatch[1];
+                let rawEvtName = evtMatch[2].trim();
+                // Clean common PDF artifacts from event name
+                rawEvtName = rawEvtName.replace(/^[-–—]\s*/, ""); // remove leading dashes
+                rawEvtName = rawEvtName.replace(/["',]/g, ""); // remove quotes/commas
+                if(rawEvtName.length > 3) currentEventName = rawEvtName;
+            } else {
+                // Fallback for just "Event 101" without name on same line
+                const shortEvt = line.match(/Event\s+(\d+)/i);
+                if(shortEvt) currentEvent = shortEvt[1];
+            }
+
             const hMatch = line.match(/Heat\s+(\d+)/i);
             if(hMatch) currentHeat = hMatch[1];
             if(line.includes("Alternates")) currentHeat = null;
@@ -401,6 +419,7 @@
                         heatId: uniqueHeatId,
                         heatTitle: displayTitle,
                         event: currentEvent,
+                        eventName: currentEventName,
                         heat: currentHeat,
                         lane: m[1], 
                         name: rawName, 
@@ -529,7 +548,6 @@
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
             
-            // Only add task if forced OR missing from cache
             if (forceRegen || !audioCache[hId]) {
                 const introText = applyHype(`Now swimming ${group.title}.`);
                 queue.push({ id: hId, text: introText });
@@ -540,6 +558,7 @@
                 if (forceRegen || !audioCache[s.id]) {
                     let txt = template
                         .replace(/{event}/g, s.event)
+                        .replace(/{event_name}/g, s.eventName)
                         .replace(/{heat}/g, s.heat)
                         .replace(/{lane}/g, s.lane)
                         .replace(/{age}/g, s.age)
@@ -554,7 +573,6 @@
             }
         }
 
-        // --- EXECUTE WORKERS (Turbo Mode) ---
         const CONCURRENCY = 5;
         let completed = 0;
         const total = queue.length;
