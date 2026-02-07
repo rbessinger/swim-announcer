@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v50 (Photo Cleaner + XNT)</title>
+    <title>Swim Announcer Ultimate v44 (Stop Button + 4 Scripts)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V50 LAYOUT --- */
+        /* --- STABLE V44 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -265,7 +265,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v50.0 (XNT & Photo Fix)</div>
+        <div class="version-tag">v44.0 (Stop + 4 Scripts)</div>
     </div>
 </div>
 
@@ -303,18 +303,21 @@
 <script>
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
-    let currentAudioObject = null;
+    let currentAudioObject = null; // Track playing audio for Stop feature
 
+    // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
 
+    // --- CLEAN KEY INPUT ---
     function cleanInput(str) {
         if (!str) return "";
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     }
 
     window.onload = () => {
+        // Init Keys
         if(localStorage.getItem('openai_key')) {
             document.getElementById('apiKey').value = localStorage.getItem('openai_key');
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
@@ -325,15 +328,18 @@
         }
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
+        // Init Engine
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
         document.getElementById('engineSelect').value = savedEngine;
         updateVoiceOptions();
 
+        // Init Dict
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
+        // Load Session
         if(localStorage.getItem('saved_heats')) loadSession();
         else loadTemplateUI();
         
@@ -341,6 +347,7 @@
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
+    // --- VOICE OPTIONS ---
     const VOICES_OPENAI = [
         {id:'nova', name:'Nova (Energetic)'}, 
         {id:'onyx', name:'Onyx (Announcer)'}, 
@@ -360,9 +367,12 @@
         const select = document.getElementById('voiceSelect');
         const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
+        
+        // Show Custom Voice Field if ElevenLabs
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
 
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
+        
         list.forEach(v => {
             const opt = document.createElement('option');
             opt.value = v.id;
@@ -378,6 +388,7 @@
         localStorage.setItem('engine_pref', engine);
     }
 
+    // --- SESSION ---
     function saveSession() {
         localStorage.setItem('saved_heats', JSON.stringify(heats));
         localStorage.setItem('saved_order', JSON.stringify(heatOrder));
@@ -387,7 +398,7 @@
         try {
             heats = JSON.parse(localStorage.getItem('saved_heats'));
             heatOrder = JSON.parse(localStorage.getItem('saved_order'));
-            if(heats && heatOrder) renderBoard();
+            if(heats && heatOrder) { renderBoard(); setStatus("Restored previous session.", "ready"); }
         } catch(e) { console.error(e); }
         loadTemplateUI();
     }
@@ -420,6 +431,7 @@
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
+    // --- TEMPLATES (ADDED 4TH OPTION) ---
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
@@ -473,80 +485,29 @@
         return text;
     }
 
+    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
-        if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
-            alert("⚠️ iPhone HEIC photos are not supported. Please convert to JPG.");
-            input.value = ''; return;
-        }
         setStatus("Processing File...", "working");
-        if (file.type === "application/pdf") handlePdf(file);
-        else if (file.type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG.");
-    }
-
-    async function processImage(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    // Simple grayscale
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const data = imgData.data;
-                    for (let i = 0; i < data.length; i += 4) {
-                        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                        data[i] = data[i + 1] = data[i + 2] = avg > 128 ? 255 : 0; // High contrast threshold
-                    }
-                    ctx.putImageData(imgData, 0, 0);
-                    resolve(canvas.toDataURL('image/png'));
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
+        const type = file.type.toLowerCase();
+        
+        if (type === "application/pdf") handlePdf(file);
+        else if (type.startsWith("image/")) handleImage(file);
+        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
     }
 
     async function handleImage(file) {
-        setStatus("Optimizing Image...", "working");
+        setStatus("Scanning Image (OCR)...", "working");
         try {
-            const cleanDataUrl = await processImage(file);
-            setStatus("Scanning Photo...", "working");
-            
-            const worker = await Tesseract.createWorker('eng', 1, {
-                logger: m => {
-                    if(m.status === 'recognizing text') {
-                        const pct = Math.round(m.progress * 100);
-                        document.getElementById('progressBar').style.display = 'block';
-                        document.getElementById('progressFill').style.width = `${pct}%`;
-                    }
-                }
-            });
-            const ret = await worker.recognize(cleanDataUrl);
+            const worker = await Tesseract.createWorker('eng');
+            const ret = await worker.recognize(file);
             await worker.terminate();
-            
-            document.getElementById('progressBar').style.display = 'none';
             document.getElementById('dataInput').value = ret.data.text;
             const count = manualParse(true);
-            
-            if(count === 0) { 
-                setStatus("OCR finished but found 0 swimmers. Is the image rotated?", "error"); 
-                alert("OCR finished, but no swimmers found.\n\nTips:\n1. Ensure photo is VERTICAL (Upright).\n2. Crop closer to the text."); 
-            } else {
-                setStatus(`Found ${count} swimmers from Photo.`, "ready");
-            }
-        } catch(e) { 
-            console.error(e); 
-            const errMsg = e.message ? e.message : JSON.stringify(e);
-            setStatus("OCR Error.", "error"); 
-            alert("Photo Error: " + errMsg);
-        }
+            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed."); }
+            else setStatus(`Found ${count} swimmers.`, "ready");
+        } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
     }
 
     async function handlePdf(file) {
@@ -572,17 +533,21 @@
             }
             document.getElementById('dataInput').value = fullText;
             const count = manualParse(true); 
-            if(count === 0) { setStatus("Auto-parse failed.", "error"); alert("Auto-parse failed."); }
+            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
             else setStatus(`Found ${count} swimmers.`, "ready");
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
+    // --- PARSER ---
     function manualParse(silent = false) {
         try {
             const raw = document.getElementById('dataInput').value;
+            const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
             let parsedData = [];
-            let currentEvent = "Unknown", currentEventName = "", currentHeat = null;
+            let currentEvent = "Unknown";
+            let currentEventName = "";
+            let currentHeat = null;
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
@@ -591,26 +556,45 @@
                     currentEvent = evtMatch[1];
                     let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
                     if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
-                } else {
+                } 
+                else {
                     const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
-                    if(shortEvt) { currentEvent = shortEvt[1]; }
+                    if(shortEvt) {
+                        currentEvent = shortEvt[1];
+                        for(let j=1; j<=2; j++) {
+                            if (i+j < lines.length) {
+                                let nextLine = lines[i+j].trim();
+                                if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
+                                    currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 const hMatch = line.match(/Heat\s+(\d+)/i);
                 if(hMatch) currentHeat = hMatch[1];
                 if(line.includes("Alternates")) currentHeat = null;
 
-                // IMPROVED REGEX FOR XNT & SPACING
-                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s*([A-Za-z0-9\s\.-]+?)\s+(XNT|NT|nt|[\d:.]+)($|\s)/i);
+                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
                 let mode = "heat";
                 if(!m) {
-                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s*([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
+                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
                     mode = "result";
                 }
 
                 if(m && (currentHeat || mode === "result")) {
                     let rawName = m[2].trim();
                     let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+                    if (nameFormat === 'last_first' && rawName.includes(',')) {
+                        const parts = rawName.split(',');
+                        if(parts.length >= 2) {
+                            let last = parts[0].trim();
+                            let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
+                            rawName = `${first} ${last}`;
+                        }
+                    }
                     if(mode === "result" && !currentHeat) currentHeat = "1";
 
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
@@ -745,7 +729,6 @@
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
-        const btn = document.getElementById('btnGenerate');
         
         // Custom Voice ID Logic
         const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
@@ -754,6 +737,7 @@
         if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
         if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
 
+        const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
         const template = document.getElementById('modalTemplateInput').value; 
         const introTemplate = document.getElementById('introScriptInput').value;
@@ -837,6 +821,7 @@
         return new Audio(URL.createObjectURL(await r.blob()));
     }
 
+    // --- STOP PLAYBACK ---
     function stopPlayback() {
         if(currentAudioObject) {
             currentAudioObject.pause();
