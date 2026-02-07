@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v54 (AI Status Bar)</title>
+    <title>Swim Announcer Ultimate v56 (Visual Feedback + Line Gluer)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V54 LAYOUT --- */
+        /* --- STABLE V56 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -33,9 +33,11 @@
         .slider-group { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
         .slider-val { float: right; color: var(--accent); font-family: monospace; }
 
-        .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; }
+        .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; position: relative; overflow: hidden; }
         .file-upload-box:hover { border-color: var(--accent); }
+        .file-upload-box.uploaded { border-color: var(--green); background: #064e3b; }
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
+        .file-icon { font-size: 1.5rem; }
         input[type="file"] { display: none; }
 
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
@@ -181,10 +183,10 @@
 
             <div>
                 <label>1. Upload Meet Program</label>
-                <label class="file-upload-box">
-                    <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">Drag PDF or Image (JPG/PNG)</div>
-                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
+                <label class="file-upload-box" id="dropZone">
+                    <span id="fileNameDisplay" class="file-icon">📄 / 📷</span>
+                    <div id="fileUploadText" class="file-upload-text">Drag PDF or Image (JPG/PNG)</div>
+                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onclick="this.value=null" onchange="handleFileUpload(this)">
                 </label>
             </div>
 
@@ -292,7 +294,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v54.0 (AI Status Bar)</div>
+        <div class="version-tag">v56.0 (Visual Feedback)</div>
     </div>
 </div>
 
@@ -361,8 +363,8 @@
             if(width >= 90) {
                 clearInterval(progressInterval); 
             } else {
-                width += 5; // Fast initially
-                if(width > 50) width += 1; // Slow down
+                width += 5; 
+                if(width > 50) width += 1; 
                 bar.style.width = width + '%';
             }
         }, 500);
@@ -375,12 +377,33 @@
             bar.style.width = '100%';
             setTimeout(() => { document.getElementById('progressBar').style.display = 'none'; }, 500);
         } else {
-            bar.style.backgroundColor = '#ef4444'; // Red for error
+            bar.style.backgroundColor = '#ef4444'; 
             setTimeout(() => { 
                 document.getElementById('progressBar').style.display = 'none'; 
                 bar.style.width = '0%'; 
                 bar.style.backgroundColor = 'var(--green)';
             }, 2000);
+        }
+    }
+
+    // --- VISUAL UI UPDATES ---
+    function setUploadState(fileName) {
+        const box = document.getElementById('dropZone');
+        const txt = document.getElementById('fileNameDisplay');
+        const sub = document.getElementById('fileUploadText');
+        
+        if(fileName) {
+            box.classList.add('uploaded');
+            txt.innerText = "✅";
+            sub.innerText = fileName;
+            sub.style.color = "#86efac";
+            sub.style.fontWeight = "bold";
+        } else {
+            box.classList.remove('uploaded');
+            txt.innerText = "📄 / 📷";
+            sub.innerText = "Drag PDF or Image (JPG/PNG)";
+            sub.style.color = "#94a3b8";
+            sub.style.fontWeight = "normal";
         }
     }
 
@@ -546,14 +569,28 @@
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
+        setUploadState(file.name); // VISUAL FEEDBACK
+
         if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
             alert("⚠️ iPhone HEIC photos are not supported. Please convert to JPG.");
-            input.value = ''; return;
+            input.value = ''; setUploadState(null); return;
         }
+        
         setStatus("Processing File...", "working");
-        if (file.type === "application/pdf") handlePdf(file);
-        else if (type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG.");
+        
+        // Brief timeout to let UI update before heavy processing
+        setTimeout(async () => {
+            try {
+                if (file.type === "application/pdf") await handlePdf(file);
+                else if (file.type.startsWith("image/")) await handleImage(file);
+                else alert("Please upload PDF, JPG, or PNG.");
+            } catch(e) {
+                console.error(e);
+                setStatus("Upload Failed.", "error");
+                setUploadState(null);
+                alert("File Error: " + e.message);
+            }
+        }, 100);
     }
 
     async function processImage(file) {
@@ -584,9 +621,10 @@
 
     async function handleImage(file) {
         setStatus("Optimizing Image...", "working");
+        setUploadState(file.name + " (Scanning...)");
+        
         try {
             const cleanDataUrl = await processImage(file);
-            setStatus("Scanning Photo...", "working");
             const worker = await Tesseract.createWorker('eng', 1, {
                 logger: m => {
                     if(m.status === 'recognizing text') {
@@ -610,6 +648,8 @@
 
     async function handlePdf(file) {
         setStatus("Reading PDF...", "working");
+        setUploadState(file.name + " (Reading...)");
+        
         try {
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -617,10 +657,14 @@
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
+                
+                // V56 IMPROVEMENT: Sort with higher tolerance to group lines
+                // '10' is the tolerance factor. Forces "Lane 1" and "Name" to stay on same line.
                 const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
                 let lines = [], currentLine = [], lastY = items[0]?.y || 0;
+                
                 items.forEach(d => {
-                    if (Math.abs(d.y - lastY) > 5) {
+                    if (Math.abs(d.y - lastY) > 10) { // CHANGED FROM 5 TO 10
                         lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
                         currentLine = []; lastY = d.y;
                     }
@@ -631,7 +675,7 @@
             }
             
             if(!fullText.trim()) {
-                alert("This PDF has no text! It might be a scanned image. Please convert to JPG and upload as an Image.");
+                alert("This PDF has no text! It might be a scanned image.");
                 setStatus("PDF Error: No text found.", "error");
                 return;
             }
@@ -724,9 +768,9 @@
         }
     }
 
-    // --- MANUAL PARSER V52 (Backup) ---
+    // --- MANUAL PARSER V56 (Split Header Fix) ---
     function manualParse(silent = false) {
-        if(document.getElementById('useAiParser').checked) return; // Don't run if AI is on
+        if(document.getElementById('useAiParser').checked) return; 
 
         try {
             const raw = document.getElementById('dataInput').value;
@@ -737,7 +781,9 @@
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
-                
+                if(line.length < 3) continue;
+
+                // 1. EVENT DETECTION
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
@@ -752,9 +798,22 @@
                     continue; 
                 } 
 
-                const hMatch = line.match(/Heat\s+(\d+)/i);
-                if(hMatch) { currentHeat = hMatch[1]; continue; }
+                // 2. HEAT DETECTION (Handling Split Lines)
+                // Case A: "Heat 2 of 4"
+                let hMatch = line.match(/Heat\s+(\d+)/i);
+                // Case B: "Heat" on one line, "2 of 4" on next line
+                if (line.toLowerCase() === "heat" && i+1 < lines.length) {
+                    const nextLine = lines[i+1].trim();
+                    const nextMatch = nextLine.match(/^(\d+)\s+of/i);
+                    if(nextMatch) hMatch = nextMatch;
+                }
 
+                if(hMatch) {
+                    currentHeat = hMatch[1];
+                    continue;
+                }
+
+                // 3. SWIMMER PARSING
                 let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+)($|\s)/);
                 if(!m) m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+.*(XNT|NT|nt|[:\d\.]+)$/);
 
@@ -779,7 +838,11 @@
                 }
             }
             
-            if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
+            if (parsedData.length === 0) { 
+                if(!silent) alert("No swimmers found. Try enabling AI Parser."); 
+                setUploadState(null); // Reset UI if failed
+                return 0; 
+            }
 
             const doOverwrite = (!heats || Object.keys(heats).length === 0 || confirm("Found swimmers. Overwrite current list?"));
             if (doOverwrite) {
