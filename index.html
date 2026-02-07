@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v8 (Event Aware)</title>
+    <title>Swim Announcer Ultimate v9 (Clean & Hype)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -83,7 +83,7 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate v8 (Fixed)</h2>
+        <h2>🏊 Ultimate v9 (Clean & Hype)</h2>
     </div>
     
     <div class="scroll-area">
@@ -107,7 +107,7 @@
                 <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
                 <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
             </div>
-            <textarea id="templateInput" style="height:80px;" oninput="markDirty()">In lane {lane}, from {team}, {name}.</textarea>
+            <textarea id="templateInput" style="height:80px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
         </div>
 
         <div>
@@ -121,8 +121,8 @@
         </div>
         
         <div>
-            <label style="color:var(--orange);">⚠️ RAW DATA (DEBUG)</label>
-            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">Check this box if names aren't loading.</div>
+            <label style="color:var(--orange);">⚠️ RAW DATA</label>
+            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">Edit manually here if parsing fails.</div>
             <textarea id="dataInput" style="height:150px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text will appear here..."></textarea>
             <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
         </div>
@@ -131,9 +131,12 @@
     <div class="action-area">
         <label style="color:white; margin-bottom:5px;">Voice</label>
         <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
-            <option value="onyx">Onyx (Male)</option>
-            <option value="nova">Nova (Female)</option>
-            <option value="alloy">Alloy (Neutral)</option>
+            <option value="nova">Nova (Energetic/Hype) 🔥</option>
+            <option value="onyx">Onyx (Deep Announcer) 🎙️</option>
+            <option value="alloy">Alloy (Neutral/Balanced)</option>
+            <option value="echo">Echo (Soft/Emotive)</option>
+            <option value="fable">Fable (British/Distinct)</option>
+            <option value="shimmer">Shimmer (Clear/Female)</option>
         </select>
         
         <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
@@ -213,15 +216,12 @@
                 fullText += lines.join("\n") + "\n";
             }
             
-            // DUMP TO RAW BOX
             document.getElementById('dataInput').value = fullText;
-            
-            // ATTEMPT AUTO PARSE
             const count = manualParse(true); 
             
             if(count === 0) {
                 setStatus("Auto-parse failed. Check Raw Data box.", "error");
-                alert("I couldn't find any swimmers. Check the Raw Data box to see if the PDF text is readable.");
+                alert("I couldn't find any swimmers automatically. Please check the 'Raw Data' box.");
             } else {
                 setStatus(`Found ${count} swimmers.`, "ready");
             }
@@ -229,7 +229,7 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER (FIXED FOR YOUR FORMAT) ---
+    // --- PARSER (CLEANED) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const lines = raw.split('\n');
@@ -239,41 +239,33 @@
 
         lines.forEach(line => {
             line = line.trim();
-            
-            // 1. Detect Event Header (e.g., "Event 101 Girls...")
             const evtMatch = line.match(/Event\s+(\d+)/i);
-            if(evtMatch) {
-                currentEvent = evtMatch[1];
-            }
-
-            // 2. Detect Heat Header (e.g., "Heat 1 of 1 Semis")
-            const hMatch = line.match(/Heat\s+(\d+)/i);
-            if(hMatch) {
-                currentHeat = hMatch[1];
-            }
+            if(evtMatch) currentEvent = evtMatch[1];
             
-            // Reset on "Alternates" line
-            if(line.includes("Alternates")) {
-                currentHeat = null;
-            }
+            const hMatch = line.match(/Heat\s+(\d+)/i);
+            if(hMatch) currentHeat = hMatch[1];
+            
+            if(line.includes("Alternates")) currentHeat = null;
 
             if(currentHeat) {
-                // 3. Detect Swimmer: LANE FIRST
-                // Format: Lane (1-2 digits) Name (text) Age (digits) Team (text) Time (digits:digits)
-                // Regex Breakdown:
-                // ^(\d{1,2})     -> Lane (Starts line)
-                // \s+            -> Space
-                // (.+?)          -> Name (Lazy match until next digit)
-                // \s+            -> Space
-                // (\d{1,2})      -> Age
-                // \s+            -> Space
-                // (.+?)          -> Team
-                // \s+            -> Space
-                // (\d+[:\.]\d{2}) -> Time (e.g. 26.38)
+                // Regex: Lane (1-2) Name (text) Age (1-2) Team (text) Time (dec)
                 const m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(\d{1,2}[:\.]\d{2})/);
                 
                 if(m) {
-                    // Create a unique Heat Key so Event 101 Heat 1 != Event 102 Heat 1
+                    let rawName = m[2].trim();
+                    let rawTeam = m[4].trim();
+
+                    // --- CLEANING AGENTS ---
+                    
+                    // 1. Remove Middle Initial (Matches "Name, First Z" or "Name, First Z.")
+                    // Logic: If it ends with Space+CapitalLetter+(Optional Dot), remove it.
+                    rawName = rawName.replace(/\s+[A-Z]\.?$/, "");
+
+                    // 2. Remove State Abbreviation (Matches "-IL", "-WI", etc at end)
+                    rawTeam = rawTeam.replace(/-[A-Z]{2}$/, "");
+
+                    // -----------------------
+
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
                     const displayTitle = `Event ${currentEvent} - Heat ${currentHeat}`;
                     
@@ -281,9 +273,9 @@
                         heatId: uniqueHeatId,
                         heatTitle: displayTitle,
                         lane: m[1], 
-                        name: m[2].trim(), 
+                        name: rawName, 
                         age: m[3],
-                        team: m[4].trim(), 
+                        team: rawTeam, 
                         time: m[5] 
                     });
                 }
@@ -304,10 +296,7 @@
             heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
         });
         
-        // Sort Heats by Event Number then Heat Number
-        // E101-H1 vs E102-H1
         heatOrder.sort(); 
-        
         renderBoard();
         return parsedData.length;
     }
@@ -325,8 +314,6 @@
         heatOrder.forEach(heatKey => {
             const group = heats[heatKey];
             const swimmers = group.swimmers;
-            
-            // Sort by Lane
             swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
 
             const heatBlock = document.createElement('div');
@@ -414,7 +401,6 @@
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
             
-            // Intro: "Now swimming Event 101, Heat 1"
             const introText = `Now swimming ${group.title}.`;
             try { const res = await fetchAI(introText, voice, key); if(res) audioCache[hId] = res; } catch(e) {}
 
