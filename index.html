@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate</title>
+    <title>Swim Announcer Ultimate v3</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f1f5f9; --text: #334155; --surface: #ffffff; --green: #10b981; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
@@ -17,6 +22,12 @@
         input, textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
         input:focus, textarea:focus { border-color: var(--accent); outline: none; }
         textarea { height: 120px; resize: none; line-height: 1.4; }
+
+        /* File Upload Styling */
+        .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; }
+        .file-upload-box:hover { border-color: var(--accent); background: #1e293b; }
+        .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
+        input[type="file"] { display: none; }
 
         /* Template Controls */
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
@@ -68,13 +79,22 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate Announcer</h2>
+        <h2>🏊 Ultimate Announcer v3</h2>
     </div>
     
     <div class="scroll-area">
         <div>
             <label>OpenAI API Key</label>
             <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
+        </div>
+
+        <div>
+            <label>Upload Meet Program (PDF)</label>
+            <label class="file-upload-box">
+                <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
+                <div class="file-upload-text">Click to upload PDF</div>
+                <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
+            </label>
         </div>
 
         <div>
@@ -89,23 +109,21 @@
             </div>
         </div>
 
-        <div>
-            <label>Voice</label>
-            <select id="voiceSelect" onchange="saveConfig()">
-                <option value="onyx">Onyx (Announcer)</option>
-                <option value="alloy">Alloy (Neutral)</option>
-                <option value="nova">Nova (Energetic)</option>
-                <option value="shimmer">Shimmer (Clear)</option>
-            </select>
-        </div>
-
-        <div>
-            <label>Data (Heat | Lane | Team | Name | Time)</label>
-            <textarea id="dataInput" placeholder="1	4	Highland Park	Michael Phelps	48.20" style="height: 150px; font-size: 0.75rem;"></textarea>
+        <div style="opacity: 0.5;">
+            <label>Raw Data (Auto-Filled)</label>
+            <textarea id="dataInput" placeholder="Manually paste here if PDF fails..." style="height: 60px; font-size: 0.75rem;"></textarea>
         </div>
     </div>
 
     <div class="action-area">
+        <label style="color:white; margin-bottom:5px;">Voice Model</label>
+        <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
+            <option value="onyx">Onyx (Announcer)</option>
+            <option value="alloy">Alloy (Neutral)</option>
+            <option value="nova">Nova (Energetic)</option>
+            <option value="shimmer">Shimmer (Clear)</option>
+        </select>
+        
         <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
             <span>⚡ GENERATE AUDIO</span>
         </button>
@@ -118,22 +136,25 @@
 <div class="main">
     <div class="top-bar">
         <div>
-            <span style="font-weight: bold;">Current Status:</span> 
+            <span style="font-weight: bold;">Status:</span> 
             <span id="statusText" class="status">Waiting for data...</span>
         </div>
         <div style="font-size: 0.85rem; color: #64748b;">
-            <b>Space:</b> Play Selected &nbsp;|&nbsp; <b>↓/↑:</b> Navigate
+            <b>Space:</b> Play &nbsp;|&nbsp; <b>↓/↑:</b> Navigate
         </div>
     </div>
 
     <div class="list-container" id="listContainer">
+        <div style="text-align:center; color:#94a3b8; margin-top:50px;">
+            Upload a PDF or paste data to begin.
         </div>
+    </div>
 </div>
 
 <script>
     // --- STATE ---
-    let appData = []; // Flat list of items (Heats and Swimmers mixed for navigation)
-    let audioCache = {}; // Key: ID, Value: Audio Object
+    let appData = [];
+    let audioCache = {};
     let currentIndex = 0;
     
     // --- CONFIG & STORAGE ---
@@ -147,30 +168,144 @@
         if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
         loadTemplateUI();
+        
+        // Prevent Sleep
+        document.addEventListener('click', async () => {
+            if ('wakeLock' in navigator && !window.wakeLockObj) {
+                try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){}
+            }
+        }, {once: true});
     };
 
     function saveConfig() {
         localStorage.setItem('openai_key', document.getElementById('apiKey').value);
         localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value);
     }
-
     function switchTab(tab) {
         currentTab = tab;
         document.getElementById('btnTab1').className = tab === 1 ? 'tab-btn active' : 'tab-btn';
         document.getElementById('btnTab2').className = tab === 2 ? 'tab-btn active' : 'tab-btn';
         loadTemplateUI();
     }
-
     function loadTemplateUI() {
         const stored = localStorage.getItem('template_' + currentTab);
         document.getElementById('templateInput').value = stored || defaultTemplates[currentTab];
     }
-
     function saveTemplate() {
         localStorage.setItem('template_' + currentTab, document.getElementById('templateInput').value);
     }
 
-    // --- PARSING ---
+    // --- PDF PARSING ENGINE ---
+    async function handlePdfUpload(input) {
+        if (!input.files[0]) return;
+        const file = input.files[0];
+        document.getElementById('statusText').innerText = "Reading PDF...";
+        document.querySelector('.file-upload-text').innerText = file.name;
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        
+        let fullText = "";
+        let parsedRows = []; // To store: {heat, lane, team, name, time}
+        
+        // Loop through all pages
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            
+            // PDF text is jumbled. Sort by Y (top to bottom), then X (left to right)
+            const items = textContent.items.map(item => ({
+                str: item.str,
+                x: item.transform[4],
+                y: item.transform[5] // Y origin is bottom-left usually
+            }));
+            
+            // Group items into "Lines" based on similar Y values (tolerance of 5px)
+            items.sort((a, b) => b.y - a.y); // Sort Top-Down
+            
+            let lines = [];
+            let currentLine = [];
+            let lastY = items[0]?.y || 0;
+
+            items.forEach(item => {
+                if (Math.abs(item.y - lastY) > 5) {
+                    // New Line detected
+                    // Sort previous line by X
+                    currentLine.sort((a, b) => a.x - b.x);
+                    lines.push(currentLine.map(obj => obj.str).join(" "));
+                    currentLine = [];
+                    lastY = item.y;
+                }
+                currentLine.push(item);
+            });
+            // Push last line
+            if (currentLine.length > 0) {
+                currentLine.sort((a, b) => a.x - b.x);
+                lines.push(currentLine.map(obj => obj.str).join(" "));
+            }
+
+            // --- PARSE LINES ---
+            let currentHeat = null;
+            let ignoreSection = false;
+
+            lines.forEach(line => {
+                line = line.trim();
+                
+                // 1. Detect Header: "Heat 1 of 1 Semis"
+                const heatMatch = line.match(/Heat\s+(\d+)\s+of/i);
+                if (heatMatch) {
+                    currentHeat = heatMatch[1];
+                    ignoreSection = false;
+                    return;
+                }
+
+                // 2. Detect "Alternates" - Stop parsing this heat
+                if (line.includes("Alternates")) {
+                    ignoreSection = true;
+                    return;
+                }
+                
+                // 3. Detect Swimmer Row
+                // Pattern from file: Name (String) Lane (Digit) Age (Digit) Team (String) Time (Decimal)
+                // Example: "Shen, Esmae Z 3 13 Patriot Aquatic Club-IL 26.38"
+                // Regex Breakdown:
+                // ^(.+?)           -> Name (Group 1, Lazy match start)
+                // \s+(\d{1,2})     -> Lane (Group 2, 1-2 digits)
+                // \s+\d{1,2}       -> Age (Skip)
+                // \s+(.+)          -> Team (Group 3, Middle text)
+                // \s+(\d+\.\d{2})  -> Time (Group 4, Ends with decimal)
+                
+                if (currentHeat && !ignoreSection) {
+                    // Note: Regex handles the specific Stevenson HS layout
+                    const rowMatch = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
+                    
+                    if (rowMatch) {
+                        parsedRows.push({
+                            heat: currentHeat,
+                            name: rowMatch[1].trim(), // "Shen, Esmae Z"
+                            lane: rowMatch[2],        // "3"
+                            team: rowMatch[3].trim(), // "Patriot Aquatic Club-IL"
+                            time: rowMatch[4]         // "26.38"
+                        });
+                    }
+                }
+            });
+        }
+
+        // Convert parsed rows to the Textarea format for the existing engine
+        let tsvOutput = "";
+        parsedRows.forEach(r => {
+            tsvOutput += `${r.heat}\t${r.lane}\t${r.team}\t${r.name}\t${r.time}\n`;
+        });
+
+        document.getElementById('dataInput').value = tsvOutput;
+        parseData(); // Trigger UI update
+        document.getElementById('statusText').innerText = `Loaded ${parsedRows.length} swimmers.`;
+        document.getElementById('statusText').className = "status ready";
+    }
+
+
+    // --- ORIGINAL CORE ENGINE ---
     function parseData() {
         const raw = document.getElementById('dataInput').value;
         const rows = raw.split('\n');
@@ -181,49 +316,31 @@
             if(!row.trim()) return;
             const parts = row.split('\t');
             
-            // Logic: If 5 cols, Col 1 is Heat. If 4 cols, treat as Heat 1 (or current heat).
             let heat, lane, team, name, time;
-            
             if (parts.length >= 5) {
                 heat = parts[0].trim();
                 lane = parts[1].trim();
                 team = parts[2].trim();
                 name = parts[3].trim();
                 time = parts[4].trim();
-            } else if (parts.length >= 3) {
-                heat = "1"; // Default
-                lane = parts[0].trim();
-                team = parts[1].trim();
-                name = parts[2].trim();
-                time = parts[3] ? parts[3].trim() : "";
-            } else { return; }
+            } else return;
 
-            // Check if new Heat
             if (heat !== currentHeat) {
                 appData.push({ type: 'header', heat: heat, id: 'h_'+heat });
                 currentHeat = heat;
             }
 
-            appData.push({ 
-                type: 'swimmer', 
-                heat: heat, 
-                lane: lane, 
-                team: team, 
-                name: name, 
-                time: time,
-                id: `s_${heat}_${lane}` 
-            });
+            appData.push({ type: 'swimmer', heat, lane, team, name, time, id: `s_${heat}_${lane}` });
         });
         
         renderList();
     }
 
-    // --- GENERATION ---
     async function generateAudio() {
         const key = document.getElementById('apiKey').value;
         if(!key.startsWith('sk-')) { alert("Invalid API Key"); return; }
         
-        parseData(); // Refresh data structure
+        parseData(); 
         if(appData.length === 0) return;
 
         const template = document.getElementById('templateInput').value;
@@ -234,7 +351,7 @@
         
         btn.disabled = true;
         btn.innerText = "GENERATING...";
-        audioCache = {}; // Clear old audio
+        audioCache = {}; 
 
         for (let i = 0; i < appData.length; i++) {
             const item = appData[i];
@@ -243,7 +360,6 @@
             if (item.type === 'header') {
                 text = `Now swimming heat ${item.heat}.`;
             } else {
-                // Parse Variables
                 text = template
                     .replace(/{heat}/g, item.heat)
                     .replace(/{lane}/g, item.lane)
@@ -253,7 +369,6 @@
             }
 
             try {
-                // API Call
                 const response = await fetch("https://api.openai.com/v1/audio/speech", {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
@@ -263,14 +378,11 @@
                 if(response.ok) {
                     const blob = await response.blob();
                     audioCache[item.id] = new Audio(URL.createObjectURL(blob));
-                    
-                    // Mark as loaded in UI
                     const el = document.getElementById(item.id);
                     if(el) el.classList.add('has-audio');
                 }
             } catch (e) { console.error(e); }
 
-            // Update Progress
             progressFill.style.width = ((i + 1) / appData.length * 100) + "%";
         }
 
@@ -282,10 +394,14 @@
         highlightCurrent();
     }
 
-    // --- UI RENDER ---
     function renderList() {
         const container = document.getElementById('listContainer');
         container.innerHTML = "";
+        
+        if (appData.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:50px;">Upload a PDF to see swimmers here.</div>`;
+            return;
+        }
         
         appData.forEach((item, index) => {
             let el;
@@ -293,7 +409,7 @@
                 el = document.createElement('div');
                 el.className = 'heat-header';
                 el.id = item.id;
-                el.innerHTML = `<span>HEAT ${item.heat}</span> <span style="font-size:0.8rem; font-weight:normal;">(Press Space to Intro)</span>`;
+                el.innerHTML = `<span>HEAT ${item.heat}</span> <span style="font-size:0.8rem; font-weight:normal;">(Press Space)</span>`;
             } else {
                 el = document.createElement('div');
                 el.className = 'swimmer-card';
@@ -308,67 +424,39 @@
                     <div class="audio-indicator"></div>
                 `;
             }
-            
-            el.onclick = () => {
-                currentIndex = index;
-                highlightCurrent();
-                playCurrent();
-            };
+            el.onclick = () => { currentIndex = index; highlightCurrent(); playCurrent(); };
             container.appendChild(el);
         });
-        
         currentIndex = 0;
         highlightCurrent();
     }
 
     function highlightCurrent() {
-        // Remove old active
         document.querySelectorAll('.active').forEach(e => e.classList.remove('active'));
-        
         if (appData[currentIndex]) {
-            const id = appData[currentIndex].id;
-            const el = document.getElementById(id);
-            if (el) {
-                el.classList.add('active');
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            const el = document.getElementById(appData[currentIndex].id);
+            if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
         }
     }
 
     function playCurrent() {
         if (!appData[currentIndex]) return;
         const id = appData[currentIndex].id;
-        
         if (audioCache[id]) {
-            // Stop others?
             audioCache[id].currentTime = 0;
             audioCache[id].play();
             document.getElementById('statusText').innerText = "Speaking...";
         } else {
-            alert("Audio not generated yet! Click Generate button.");
+            // Optional: fallback to browser TTS if audio not generated
+            if (confirm("Audio not generated yet. Generate now?")) generateAudio();
         }
     }
 
-    // --- NAVIGATION ---
     document.addEventListener('keydown', (e) => {
         if (appData.length === 0) return;
-        
-        if (e.code === 'Space') {
-            e.preventDefault();
-            playCurrent();
-        } else if (e.code === 'ArrowDown') {
-            e.preventDefault();
-            if (currentIndex < appData.length - 1) {
-                currentIndex++;
-                highlightCurrent();
-            }
-        } else if (e.code === 'ArrowUp') {
-            e.preventDefault();
-            if (currentIndex > 0) {
-                currentIndex--;
-                highlightCurrent();
-            }
-        }
+        if (e.code === 'Space') { e.preventDefault(); playCurrent(); } 
+        else if (e.code === 'ArrowDown') { e.preventDefault(); if (currentIndex < appData.length - 1) { currentIndex++; highlightCurrent(); } } 
+        else if (e.code === 'ArrowUp') { e.preventDefault(); if (currentIndex > 0) { currentIndex--; highlightCurrent(); } }
     });
 
 </script>
