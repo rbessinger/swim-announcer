@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v22 (Persistent)</title>
+    <title>Swim Announcer Ultimate v25 (Stable)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
         /* SIDEBAR */
-        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
@@ -20,6 +21,7 @@
 
         .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; position: relative; }
 
+        /* VIEW TOGGLING */
         .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
         .view-section.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -60,8 +62,9 @@
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
-        .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; }
-        .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        /* MAIN DASHBOARD */
+        .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
+        .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 10; flex-shrink: 0; }
         .status { font-weight: bold; font-size: 0.9rem; color: #64748b; }
         .status.ready { color: var(--green); }
         .status.working { color: var(--accent); }
@@ -119,12 +122,13 @@
         .modal-content { 
             background: #0f172a; width: 600px; padding: 30px; border-radius: 12px; 
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; 
-            color: #94a3b8; display: flex; flex-direction: column; gap: 20px;
+            color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
         .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
         .close-btn:hover { color: white; }
+        .version-tag { position: absolute; bottom: 15px; right: 20px; font-size: 0.7rem; color: #334155; font-family: monospace; }
 
         .var-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .var-chip { 
@@ -151,8 +155,8 @@
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">Drag PDF or Image here</div>
-                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
+                    <div class="file-upload-text">Drag PDF or Image (HEIC/JPG)</div>
+                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg,.heic" onchange="handleFileUpload(this)">
                 </label>
             </div>
 
@@ -242,7 +246,29 @@
             <div class="modal-title">⚙️ SETTINGS</div>
             <button class="close-btn" onclick="toggleSettings()">&times;</button>
         </div>
-        <p style="color:#64748b;">(Use sidebar settings for now)</p>
+        
+        <div>
+            <label>OpenAI API Key</label>
+            <input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()">
+        </div>
+
+        <div>
+            <label>Phonetic Dictionary (JSON)</label>
+            <textarea id="dictInputModal" style="height:100px; font-size:0.75rem;" onchange="saveDictFromModal()">
+{
+  "Nguyen": "Win",
+  "Gavrilos": "Gah-vree-los"
+}
+            </textarea>
+        </div>
+
+        <div>
+            <label style="color:var(--orange);">Raw Data (Debug)</label>
+            <textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
+            <button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button>
+        </div>
+        
+        <div class="version-tag">v25.0 (Stable)</div>
     </div>
 </div>
 
@@ -293,72 +319,62 @@
     let isScriptOpen = false;
 
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
+        if(localStorage.getItem('openai_key')) {
+            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
+            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
+        }
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
+        
+        // Sync Dict
+        if(localStorage.getItem('phonetic_dict')) {
+            document.getElementById('dictInput').value = localStorage.getItem('phonetic_dict');
+            document.getElementById('dictInputModal').value = localStorage.getItem('phonetic_dict');
+        }
+
         loadTemplateUI();
         updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
     function toggleSettings() {
-        isSettingsOpen = !isSettingsOpen;
-        document.getElementById('viewMain').classList.toggle('active', !isSettingsOpen);
-        document.getElementById('viewSettings').classList.toggle('active', isSettingsOpen);
-        document.getElementById('sidebarTitle').innerText = isSettingsOpen ? "⚙️ SETTINGS" : "🏊 RUN SHOW";
+        const modal = document.getElementById('settingsModal');
+        modal.classList.toggle('active');
+        // Sync Data Input
+        document.getElementById('dataInputModal').value = document.getElementById('dataInput').value;
     }
 
-    // --- SCRIPT EDITOR LOGIC ---
-    function toggleScriptEditor() {
-        isScriptOpen = !isScriptOpen;
-        const modal = document.getElementById('scriptModal');
-        modal.classList.toggle('active', isScriptOpen);
-        
-        if(isScriptOpen) {
-            document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value;
-            document.getElementById('goBtnContainer').classList.add('disabled');
-        } else {
-            document.getElementById('goBtnContainer').classList.remove('disabled');
-        }
+    function saveConfig() { 
+        localStorage.setItem('openai_key', document.getElementById('apiKey').value); 
+        localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); 
     }
-
-    function syncScript() {
-        const bodyVal = document.getElementById('modalTemplateInput').value;
-        const introVal = document.getElementById('introScriptInput').value;
-        
-        document.getElementById('templatePreview').value = bodyVal;
-        
-        // Save both fields
-        localStorage.setItem('t_'+currentTab, bodyVal);
-        localStorage.setItem('intro_'+currentTab, introVal);
-        
-        markDirty();
-    }
-
-    function insertVar(text) {
-        // Decide which box has focus (or default to main script)
-        let el = document.activeElement;
-        if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
-        
-        const start = el.selectionStart;
-        const end = el.selectionEnd;
-        const val = el.value;
-        el.value = val.substring(0, start) + text + val.substring(end);
-        el.selectionStart = el.selectionEnd = start + text.length;
-        el.focus();
-        syncScript();
-    }
-
-    function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
     
+    function saveConfigFromModal() {
+        const key = document.getElementById('apiKeyModal').value;
+        document.getElementById('apiKey').value = key;
+        localStorage.setItem('openai_key', key);
+    }
+
+    function saveDictFromModal() {
+        const dict = document.getElementById('dictInputModal').value;
+        document.getElementById('dictInput').value = dict;
+        localStorage.setItem('phonetic_dict', dict);
+    }
+
+    function manualParseFromModal() {
+        document.getElementById('dataInput').value = document.getElementById('dataInputModal').value;
+        manualParse();
+    }
+
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.",
         3: "In {place} place, with a time of {time}, from {team}, {name}."
     };
+    
     const defaultIntros = {
         1: "Now swimming {event_title}.",
-        2: "Ladies and gentlemen, welcome to the finals for {event_title}.",
-        3: "Here are the results for {event_title}."
+        2: "Ladies and gentlemen, please welcome the finalists for {event_title}.",
+        3: "And now, the results for {event_title}."
     };
 
     let currentTab = 1;
@@ -405,13 +421,34 @@
         return text;
     }
 
+    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
         setStatus("Processing File...", "working");
-        if (file.type === "application/pdf") handlePdf(file);
-        else if (file.type.startsWith("image/")) handleImage(file);
-        else alert("Please upload a PDF or Image (JPG/PNG).");
+        
+        const type = file.type.toLowerCase();
+        
+        if (type === "application/pdf") {
+            handlePdf(file);
+        } else if (type.includes("heic")) {
+            handleHeic(file);
+        } else if (type.startsWith("image/")) {
+            handleImage(file);
+        } else {
+            alert("Please upload PDF, JPG, PNG, or HEIC.");
+        }
+    }
+
+    async function handleHeic(file) {
+        setStatus("Converting HEIC...", "working");
+        try {
+            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
+            handleImage(blob);
+        } catch(e) {
+            console.error(e);
+            setStatus("HEIC Conversion Failed.", "error");
+        }
     }
 
     async function handleImage(file) {
@@ -436,351 +473,4 @@
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
-                let lines = [], currentLine = [], lastY = items[0]?.y || 0;
-                items.forEach(d => {
-                    if (Math.abs(d.y - lastY) > 5) {
-                        lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
-                        currentLine = []; lastY = d.y;
-                    }
-                    currentLine.push(d);
-                });
-                if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
-                fullText += lines.join("\n") + "\n";
-            }
-            document.getElementById('dataInput').value = fullText;
-            const count = manualParse(true); 
-            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
-            else setStatus(`Found ${count} swimmers.`, "ready");
-        } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
-    }
-
-    function manualParse(silent = false) {
-        const raw = document.getElementById('dataInput').value;
-        const nameFormat = document.getElementById('nameFormatSelect').value; 
-        const lines = raw.split('\n');
-        let parsedData = [];
-        let currentEvent = "Unknown";
-        let currentEventName = "";
-        let currentHeat = null;
-
-        for(let i=0; i<lines.length; i++) {
-            let line = lines[i].trim();
-            
-            const evtMatch = line.match(/^Event\s+(\d+)\s+(.*)/i);
-            if(evtMatch) {
-                currentEvent = evtMatch[1];
-                currentEventName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-            } else {
-                const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
-                if(shortEvt) {
-                    currentEvent = shortEvt[1];
-                    if (i + 1 < lines.length) {
-                        let nextLine = lines[i+1].trim();
-                        if (!nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
-                            currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
-                        }
-                    }
-                }
-            }
-
-            const hMatch = line.match(/Heat\s+(\d+)/i);
-            if(hMatch) currentHeat = hMatch[1];
-            if(line.includes("Alternates")) currentHeat = null;
-
-            let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-            let mode = "heat";
-            if(!m) {
-                m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
-                mode = "result";
-            }
-
-            if(m && (currentHeat || mode === "result")) {
-                let rawName = m[2].trim();
-                let rawTeam = m[4].trim();
-                rawTeam = rawTeam.replace(/-[A-Z]{2}$/, "");
-
-                if (nameFormat === 'last_first' && rawName.includes(',')) {
-                    const parts = rawName.split(',');
-                    if(parts.length >= 2) {
-                        let last = parts[0].trim();
-                        let first = parts[1].trim();
-                        first = first.replace(/\s+[A-Z]\.?$/, "");
-                        rawName = `${first} ${last}`;
-                    }
-                }
-
-                if(mode === "result" && !currentHeat) currentHeat = "1";
-
-                const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat}`;
-                
-                parsedData.push({ 
-                    heatId: uniqueHeatId,
-                    heatTitle: displayTitle,
-                    event: currentEvent,
-                    eventName: currentEventName,
-                    heat: currentHeat,
-                    lane: m[1], 
-                    place: m[1], 
-                    name: rawName, 
-                    age: m[3],
-                    team: rawTeam, 
-                    time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
-                });
-            }
-        }
-        
-        if (parsedData.length === 0 && !silent) return 0;
-
-        heats = {}; heatOrder = [];
-        parsedData.forEach(s => {
-            if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
-            heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
-        });
-        
-        heatOrder.sort(); 
-        renderBoard();
-        return parsedData.length;
-    }
-
-    function renderBoard() {
-        const container = document.getElementById('listContainer');
-        container.innerHTML = "";
-        
-        if (heatOrder.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF or Image to begin.</p></div>`;
-            return;
-        }
-        
-        heatOrder.forEach(heatKey => {
-            const group = heats[heatKey];
-            const swimmers = group.swimmers;
-            swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
-
-            const heatBlock = document.createElement('div');
-            heatBlock.className = 'heat-block';
-            
-            const header = document.createElement('div');
-            header.className = 'heat-header';
-            header.innerHTML = `<div class="heat-title">${group.title}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
-            header.onclick = () => selectCue(heatKey, -1);
-            if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
-            
-            heatBlock.appendChild(header);
-
-            swimmers.forEach((s, idx) => {
-                const row = document.createElement('div');
-                row.className = `swimmer-row ${s.scratched ? 'scratched' : ''}`;
-                if(currentSelection.heat === heatKey && currentSelection.index === idx) row.classList.add('active');
-                if(audioCache[s.id]) row.classList.add('has-audio');
-                
-                row.draggable = true;
-                row.ondragstart = (e) => dragStart(e, heatKey, idx);
-                row.ondragover = (e) => e.preventDefault(); 
-                row.ondrop = (e) => drop(e, heatKey, idx);
-
-                row.innerHTML = `
-                    <div class="col-lane">${s.lane}</div>
-                    <div class="col-info">
-                        <div class="name-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'name', this)">${s.name}</div>
-                        <div class="team-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'team', this)">${s.team}</div>
-                    </div>
-                    <div class="col-time">${s.time}</div>
-                    <button class="btn-scratch ${s.scratched?'active':''}" onclick="toggleScratch('${heatKey}', ${idx})">X</button>
-                    <div class="audio-dot"></div>
-                `;
-                
-                row.onclick = (e) => { 
-                    if(!e.target.isContentEditable && e.target.tagName !== 'BUTTON') selectCue(heatKey, idx); 
-                };
-                heatBlock.appendChild(row);
-            });
-            container.appendChild(heatBlock);
-        });
-    }
-
-    let dragSrc = null;
-    function dragStart(e, heat, index) { dragSrc = { heat, index }; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
-    function drop(e, targetHeat, targetIndex) {
-        e.preventDefault();
-        if(!dragSrc) return;
-        const srcList = heats[dragSrc.heat].swimmers;
-        const swimmer = srcList[dragSrc.index];
-        srcList.splice(dragSrc.index, 1);
-        
-        const targetList = heats[targetHeat].swimmers;
-        const targetSwimmer = targetList[targetIndex];
-        swimmer.lane = targetSwimmer.lane; 
-        
-        if (dragSrc.heat === targetHeat && targetIndex > dragSrc.index) targetIndex--; 
-        targetList.splice(targetIndex, 0, swimmer);
-        
-        if(srcList.length === 0) delete heats[dragSrc.heat];
-        dragSrc = null;
-        markDirty(); renderBoard();
-    }
-
-    function updateData(heat, idx, field, el) { heats[heat].swimmers[idx][field] = el.innerText; markDirty(); }
-    function toggleScratch(heat, idx) { heats[heat].swimmers[idx].scratched = !heats[heat].swimmers[idx].scratched; renderBoard(); }
-    function selectCue(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); }
-
-    async function generateAudio() {
-        const key = document.getElementById('apiKey').value;
-        if(!key.startsWith('sk-')) { alert("Missing API Key. Check Settings."); toggleSettings(); return; }
-        
-        const btn = document.getElementById('btnGenerate');
-        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
-        
-        const template = document.getElementById('modalTemplateInput').value; 
-        const introTemplate = document.getElementById('introScriptInput').value;
-        const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-        const voice = document.getElementById('voiceSelect').value;
-        const forceRegen = document.getElementById('forceRegen').checked;
-        
-        const queue = [];
-        
-        for (const heatKey of heatOrder) {
-            const group = heats[heatKey];
-            const hId = `h_${heatKey}`;
-            
-            if (forceRegen || !audioCache[hId]) {
-                // Use the custom Intro Template
-                let introText = introTemplate;
-                // Build Title (Event + Name)
-                let eventTitle = `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}`;
-                if (group.swimmers[0].heat) eventTitle += `, Heat ${group.swimmers[0].heat}`;
-                else eventTitle += ", Results"; // Fallback for results mode
-
-                introText = introText.replace(/{event_title}/g, eventTitle);
-                
-                // Also support individual variables in intro if user wants
-                introText = introText
-                    .replace(/{event}/g, group.swimmers[0].event)
-                    .replace(/{event_name}/g, group.swimmers[0].eventName)
-                    .replace(/{heat}/g, group.swimmers[0].heat);
-
-                introText = applyHype(introText);
-                queue.push({ id: hId, text: introText });
-            }
-
-            for (const s of group.swimmers) {
-                if(s.scratched) continue;
-                if (forceRegen || !audioCache[s.id]) {
-                    // Build Event Title variable for swimmer scripts
-                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-
-                    let txt = template
-                        .replace(/{event_title}/g, sEventTitle)
-                        .replace(/{event}/g, s.event)
-                        .replace(/{event_name}/g, s.eventName)
-                        .replace(/{heat}/g, s.heat)
-                        .replace(/{lane}/g, s.lane)
-                        .replace(/{place}/g, s.place)
-                        .replace(/{age}/g, s.age)
-                        .replace(/{team}/g, s.team)
-                        .replace(/{name}/g, s.name)
-                        .replace(/{time}/g, s.time);
-
-                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                    txt = applyHype(txt);
-                    queue.push({ id: s.id, text: txt });
-                }
-            }
-        }
-
-        const CONCURRENCY = 5;
-        let completed = 0;
-        const total = queue.length;
-        
-        if (total === 0) {
-            btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready");
-            return;
-        }
-
-        setStatus(`Generating ${total} audio files...`, "working");
-
-        async function worker() {
-            while (queue.length > 0) {
-                const task = queue.shift();
-                try {
-                    const res = await fetchAI(task.text, voice, key);
-                    if(res) audioCache[task.id] = res;
-                } catch(e) { console.error(e); }
-                completed++;
-                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
-            }
-        }
-
-        const workers = [];
-        for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
-        await Promise.all(workers);
-
-        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
-    }
-
-    async function fetchAI(text, voice, key) {
-        const r = await fetch("https://api.openai.com/v1/audio/speech", {
-            method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: 1.0 })
-        });
-        if(r.ok) return new Audio(URL.createObjectURL(await r.blob()));
-        return null;
-    }
-
-    function triggerGo() {
-        const { heat, index } = currentSelection;
-        if(heat === null) {
-            if(heatOrder.length > 0) selectCue(heatOrder[0], -1);
-            else return;
-        }
-        playSelection();
-        navigate(1);
-    }
-
-    function playSelection() {
-        const { heat, index } = currentSelection;
-        let aud = null;
-        let msg = "";
-
-        if(index === -1) {
-            aud = audioCache[`h_${heat}`];
-            msg = `Announcing ${heats[heat].title}...`;
-        } else {
-            const s = heats[heat].swimmers[index];
-            if(!s.scratched) {
-                aud = audioCache[s.id];
-                msg = `Announcing Lane ${s.lane}...`;
-            } else {
-                msg = "Skipping Scratched...";
-            }
-        }
-
-        if(aud) { aud.currentTime=0; aud.play(); setStatus(msg, "working"); }
-        else setStatus("No Audio Generated.", "working");
-    }
-
-    document.addEventListener('keydown', (e) => {
-        if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
-        if(!heats || Object.keys(heats).length === 0) return;
-        if(e.code === 'Space') { e.preventDefault(); triggerGo(); } 
-        else if(e.code === 'ArrowDown') navigate(1);
-        else if(e.code === 'ArrowUp') navigate(-1);
-    });
-
-    function navigate(dir) {
-        let flatMap = [];
-        heatOrder.forEach(h => {
-            flatMap.push({ heat: h, index: -1 }); 
-            heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
-        });
-        let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
-        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
-        if(currIdx >= 0 && currIdx < flatMap.length) {
-            currentSelection = flatMap[currIdx]; renderBoard();
-            const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
-        }
-    }
-</script>
-</body>
-</html>
+                const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a
