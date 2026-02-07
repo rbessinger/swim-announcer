@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer v45 (Layout Fix + Outro)</title>
+    <title>Swim Announcer v47 (Hy-Tek Multi-Mode)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -28,6 +28,13 @@
         input[type="text"], input[type="password"], textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
         input:focus, textarea:focus { border-color: var(--accent); outline: none; }
         
+        /* Radio Buttons for Hy-Tek Mode */
+        .radio-group { display: flex; flex-direction: column; gap: 8px; background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
+        .radio-option { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .radio-option input { accent-color: var(--accent); }
+        .radio-label-main { color: #f8fafc; font-weight: bold; font-size: 0.9rem; }
+        .radio-label-sub { color: #94a3b8; font-size: 0.75rem; }
+
         input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
         .slider-group { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
         .slider-val { float: right; color: var(--accent); font-family: monospace; }
@@ -156,21 +163,32 @@
         
         <div id="viewMain" class="view-section active">
             <div>
-                <label>1. Upload Meet Program</label>
+                <label>1. HY-TEK REPORT FORMAT</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="hytekMode" value="heat2col" checked onchange="manualParse()">
+                        <div>
+                            <div class="radio-label-main">Heats (2-Columns)</div>
+                            <div class="radio-label-sub">Standard Meet Program containing Left & Right columns.</div>
+                        </div>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="hytekMode" value="result1col" onchange="manualParse()">
+                        <div>
+                            <div class="radio-label-main">Results/Psych (1-Column)</div>
+                            <div class="radio-label-sub">Results or Psych sheets that list rankings top-to-bottom.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top:20px;">
+                <label>2. Upload File</label>
                 <label class="file-upload-box">
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
                     <div class="file-upload-text">Drag PDF or Image (JPG/PNG)</div>
                     <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
                 </label>
-            </div>
-
-            <div>
-                <label>PDF Layout</label>
-                <select id="layoutModeSelect" onchange="manualParse()">
-                    <option value="2col">2 Columns (Standard Heat Sheet)</option>
-                    <option value="1col">1 Column (Results / Psych Sheet)</option>
-                </select>
-                <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">Switch this if names are jumbled or out of order.</div>
             </div>
 
             <div style="margin-top:10px;">
@@ -183,7 +201,7 @@
 
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; margin-top:15px;">
-                    <label style="margin:0;">2. Script Template</label>
+                    <label style="margin:0;">3. Script Template</label>
                     <button onclick="toggleScriptEditor()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.8rem; font-weight:bold;">✏️ Edit</button>
                 </div>
                 <div class="template-tabs">
@@ -196,7 +214,7 @@
             </div>
 
             <div>
-                <label>3. Select Engine</label>
+                <label>4. Select Engine</label>
                 <select id="engineSelect" onchange="updateVoiceOptions()" style="margin-bottom:10px;">
                     <option value="openai">OpenAI (Fast & Cheap)</option>
                     <option value="elevenlabs">ElevenLabs (High Quality)</option>
@@ -246,7 +264,7 @@
     <div class="top-bar">
         <div>
             <span style="font-weight: bold;">Status:</span> 
-            <span id="statusText" class="status">Waiting for PDF...</span>
+            <span id="statusText" class="status">Select Format & Upload File...</span>
         </div>
         <div style="display:flex; align-items:center; gap:20px;">
             <button class="btn-stop-main" onclick="stopPlayback()">
@@ -261,7 +279,7 @@
     <div class="list-container" id="listContainer">
         <div style="text-align:center; color:#94a3b8; margin-top:100px;">
             <h3>Welcome to Heat Manager</h3>
-            <p>Upload a PDF or Image to see heats.</p>
+            <p>1. Select Hy-Tek Format (Left Sidebar)<br>2. Upload PDF or Image</p>
         </div>
     </div>
 
@@ -277,7 +295,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v45.0 (Layout Fix)</div>
+        <div class="version-tag">v47.0 (Hy-Tek Multi-Mode)</div>
     </div>
 </div>
 
@@ -323,7 +341,6 @@
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
     let currentAudioObject = null;
-    let currentLayoutMode = '2col'; // Default to standard heat sheet
 
     // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
@@ -531,7 +548,7 @@
     async function handlePdf(file) {
         setStatus("Reading PDF...", "working");
         try {
-            currentLayoutMode = document.getElementById('layoutModeSelect').value;
+            const currentLayoutMode = document.querySelector('input[name="hytekMode"]:checked').value;
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             let fullText = "";
@@ -542,20 +559,16 @@
                 const viewport = page.getViewport({ scale: 1 });
                 const midPoint = viewport.width / 2;
                 
-                // Get all text items
-                const items = textContent.items.map(d => ({ 
-                    str: d.str, x: d.transform[4], y: d.transform[5] 
-                }));
+                const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] }));
 
-                // LAYOUT LOGIC
-                if (currentLayoutMode === '2col') {
-                    // Split Left/Right
+                // --- BIFURCATED PDF EXTRACTION ---
+                if (currentLayoutMode === 'heat2col') {
+                    // Split Left/Right for standard heat sheets
                     const leftItems = items.filter(i => i.x < midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
                     const rightItems = items.filter(i => i.x >= midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
                     fullText += processBlock(leftItems) + "\n" + processBlock(rightItems) + "\n";
                 } else {
-                    // 1 Column - Sort mostly by Y (top to bottom)
-                    // We give a small tolerance to Y (5px) so items on "same line" sort by X
+                    // 1 Column (Results) - Sort strictly top to bottom
                     items.sort((a,b) => (b.y - a.y) || (a.x - b.x));
                     fullText += processBlock(items) + "\n";
                 }
@@ -563,7 +576,7 @@
             
             document.getElementById('dataInput').value = fullText;
             const count = manualParse(true); 
-            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
+            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("No swimmers found. Did you select the correct Hy-Tek format?"); }
             else setStatus(`Found ${count} swimmers.`, "ready");
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
@@ -583,12 +596,16 @@
 
     function manualParse(silent = false) {
         try {
+            const currentLayoutMode = document.querySelector('input[name="hytekMode"]:checked').value;
             let raw = document.getElementById('dataInput').value;
-            // PRE-CLEAN COMMON OCR ERRORS
+            
+            // --- PRE-CLEANING ---
             raw = raw.replace(/Club-I1/g, "Club-IL").replace(/Club-1l/g, "Club-IL");
-            raw = raw.replace(/(\d{1}):(\d{4})/g, "$1:$2");
-            // Fix merged line issue "7 Name ... 8 Name" -> Split them
-            raw = raw.replace(/(\d+ [A-Za-z, \.-]+ \d{1,2} .+? [\d:.]+) (\d+ [A-Za-z, \.-]+)/g, "$1\n$2");
+            raw = raw.replace(/(\d{1}):(\d{4})/g, "$1:$2"); // Fix OCR time errors
+            // CRITICAL: Split merged lines in 1-column reports (e.g. "7 Name... 8 Name...")
+            if (currentLayoutMode === 'result1col') {
+                 raw = raw.replace(/(\d+ [A-Za-z, \.-]+ \d{1,2} .+? (?:NT|[\d:.]+).*?) (\d+ [A-Za-z, \.-]+)/g, "$1\n$2");
+            }
 
             const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
@@ -599,65 +616,76 @@
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
+                if(line.length < 5) continue;
+
+                // --- EVENT DETECTION (Common to both modes) ---
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
                     let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
-                    currentHeat = "1"; 
-                } 
-                else {
+                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name|Team/i)) currentEventName = rawName;
+                    currentHeat = "1"; // Reset heat
+                } else {
                     const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
-                    if(shortEvt) {
-                        currentEvent = shortEvt[1];
-                        currentHeat = "1";
-                    }
+                    if(shortEvt) { currentEvent = shortEvt[1]; currentHeat = "1"; }
                 }
 
+                // --- HEAT DETECTION (Mostly for 2-col mode) ---
                 const hMatch = line.match(/Heat\s+(\d+)/i);
                 if(hMatch) currentHeat = hMatch[1];
 
-                // Regex 1: Heat Sheet (Lane Name Age Team Time)
-                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-                
-                // Regex 2: Results Sheet (Rank Name Age Team Time1 Time2 Flag)
-                // Relaxed end to catch 'q', 'DQ', etc.
-                if (!m) {
-                     m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+(?:NT|[\d:\.]+)\s+([\d:\.]+).*/i);
+                let m = null;
+                let rawName, rawTeam, timeVal, lanePlace, ageVal;
+
+                // --- BIFURCATED PARSING LOGIC ---
+                if (currentLayoutMode === 'heat2col') {
+                    // >>> MODE 1: 2-COLUMN HEAT SHEET (Lane starts line) <<<
+                    // Regex: Lane | Name | Age | Team | Time
+                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                    if (m) {
+                        lanePlace = m[1]; rawName = m[2]; ageVal = m[3]; rawTeam = m[4]; timeVal = m[5];
+                    }
+                } else {
+                    // >>> MODE 2: 1-COLUMN RESULTS/PSYCH (Rank starts line) <<<
+                    // Regex: Rank | Name | Age | Team | Time(s) | Flags
+                    // This regex is greedy for times to catch Prelim+Final times, then takes the last one.
+                    m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+((?:NT|[\d:\.]+\s*)+).*$/i);
+                    if (m) {
+                        lanePlace = m[1]; rawName = m[2]; ageVal = m[3]; rawTeam = m[4];
+                        // Handle multiple times (take the last one found)
+                        let times = m[5].trim().split(/\s+/);
+                        timeVal = times[times.length-1];
+                    }
                 }
 
+                // --- COMMON DATA PROCESSING ---
                 if(m && currentEvent) {
-                    let rawName = m[2].trim();
-                    let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+                    rawName = rawName.trim();
+                    rawTeam = rawTeam.trim().replace(/-[A-Z]{2}$/, ""); // Remove state suffix if present
                     
                     if (nameFormat === 'last_first' && rawName.includes(',')) {
                         const parts = rawName.split(',');
                         if(parts.length >= 2) {
-                            let last = parts[0].trim();
-                            let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
-                            rawName = `${first} ${last}`;
+                            rawName = `${parts[1].trim().replace(/\s+[A-Z]\.?$/, "")} ${parts[0].trim()}`;
                         }
                     }
 
                     if(!currentHeat) currentHeat = "1";
-
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
                     const displayTitle = `Event ${currentEvent} - ${currentEventName}`;
                     
-                    let timeVal = m[5].toUpperCase();
-                    if(timeVal.match(/^\d:\d{4}$/)) {
-                        timeVal = timeVal.slice(0, 4) + "." + timeVal.slice(4);
-                    }
+                    timeVal = timeVal.toUpperCase();
+                    if(timeVal.match(/^\d:\d{4}$/)) timeVal = timeVal.slice(0, 4) + "." + timeVal.slice(4); // OCR Fix
 
                     parsedData.push({ 
                         heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
-                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
+                        heat: currentHeat, lane: lanePlace, place: lanePlace, name: rawName, age: ageVal, team: rawTeam, 
                         time: timeVal
                     });
                 }
             }
             
-            if (parsedData.length === 0) { if(!silent) alert("No swimmers found. Try switching Layout Mode (PDF)."); return 0; }
+            if (parsedData.length === 0) { if(!silent) alert("No swimmers found. Please verify the selected Hy-Tek Format matches your file."); return 0; }
 
             if (!heats || Object.keys(heats).length === 0 || confirm("Overwrite current list?")) {
                 heats = {}; heatOrder = [];
@@ -665,15 +693,20 @@
                     if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
                     heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
                 });
-                heatOrder.sort(); 
+                // Sort Heats intelligently (E1H1, E1H2, E2H1...)
+                heatOrder.sort((a,b) => {
+                     const [eA, hA] = a.replace(/[EH]/g, "").split("-").map(Number);
+                     const [eB, hB] = b.replace(/[EH]/g, "").split("-").map(Number);
+                     return eA - eB || hA - hB;
+                });
                 saveSession();
                 renderBoard();
                 
-                // Auto-switch to Results Template if it looks like results
-                if(parsedData.length > 8 && currentTab !== 3) {
-                   if(confirm("This looks like Results data. Switch to Results script mode?")) {
-                       switchTab(3);
-                   }
+                // Auto-switch tab based on mode
+                if (currentLayoutMode === 'result1col' && currentTab !== 3) {
+                   if(confirm("Switched to Results Mode. Change script template to Results?")) switchTab(3);
+                } else if (currentLayoutMode === 'heat2col' && currentTab !== 1) {
+                   if(confirm("Switched to Heat Sheet Mode. Change script template to Heats?")) switchTab(1);
                 }
             }
             return parsedData.length;
@@ -683,11 +716,12 @@
     function renderBoard() {
         const container = document.getElementById('listContainer');
         container.innerHTML = "";
-        if (heatOrder.length === 0) { container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF or Image to begin.</p></div>`; return; }
+        if (heatOrder.length === 0) { container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Select Format & Upload File.</p></div>`; return; }
         
         heatOrder.forEach(heatKey => {
             const group = heats[heatKey];
             const swimmers = group.swimmers;
+            // Sort by Lane/Rank
             swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
 
             const heatBlock = document.createElement('div');
