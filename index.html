@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v57 (Stream Parser)</title>
+    <title>Swim Announcer Ultimate v58 (Anti-Freeze)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V57 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -74,7 +73,9 @@
         .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* MAIN DASHBOARD */
+        .ai-toggle-box { background: #1e1b4b; border: 1px solid #4f46e5; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .ai-badge { background: linear-gradient(90deg, #4f46e5, #ec4899); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; margin-left: 5px; }
+
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 1000; flex-shrink: 0; }
         
@@ -183,7 +184,16 @@
     <div class="scroll-area">
         
         <div id="viewMain" class="view-section active">
-            
+            <div class="ai-toggle-box">
+                <label class="checkbox-row" style="margin-bottom:0;">
+                    <input type="checkbox" id="useAiParser" onchange="toggleAiParser()">
+                    <span style="color:white; font-size:0.9rem;">Enable AI Parser <span class="ai-badge">SMART</span></span>
+                </label>
+                <div style="font-size:0.7rem; color:#94a3b8; margin-top:5px; margin-left:24px;">
+                    Uses OpenAI to read messy files. Slower but more accurate.
+                </div>
+            </div>
+
             <div id="debugConsole" class="debug-console"></div>
 
             <div>
@@ -195,7 +205,7 @@
                 </label>
             </div>
 
-            <div>
+            <div id="manualFormatDiv">
                 <label>Name Format</label>
                 <select id="nameFormatSelect" onchange="streamParse()">
                     <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
@@ -299,7 +309,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v57.0 (Stream Parser)</div>
+        <div class="version-tag">v58.0 (Anti-Freeze)</div>
     </div>
 </div>
 
@@ -339,6 +349,8 @@
     let isSettingsOpen = false; let isScriptOpen = false;
     let currentAudioObject = null;
     let viewMode = 'heats'; 
+    let progressInterval;
+    let loadTimeout; // Safety timer
 
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
@@ -349,7 +361,12 @@
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     }
 
-    // --- DEBUG LOGGING ---
+    function toggleAiParser() {
+        const useAi = document.getElementById('useAiParser').checked;
+        document.getElementById('manualFormatDiv').style.display = useAi ? 'none' : 'block';
+    }
+
+    // --- DEBUG & LOADING ---
     function log(msg) {
         const consoleEl = document.getElementById('debugConsole');
         consoleEl.style.display = 'block';
@@ -361,42 +378,67 @@
     function showLoading(text) {
         document.getElementById('loadingOverlay').style.display = 'flex';
         document.getElementById('loadingText').innerText = text;
+        
+        // Safety Timeout (15 seconds)
+        clearTimeout(loadTimeout);
+        loadTimeout = setTimeout(() => {
+            hideLoading();
+            alert("Error: Operation timed out. Check file or network.");
+            log("Error: Timeout triggered.");
+        }, 15000);
     }
     
     function hideLoading() {
         document.getElementById('loadingOverlay').style.display = 'none';
+        clearTimeout(loadTimeout);
     }
 
-    // --- VISUAL UI UPDATES ---
+    function startFakeProgress() {
+        const bar = document.getElementById('progressFill');
+        const container = document.getElementById('progressBar');
+        container.style.display = 'block';
+        bar.style.width = '0%';
+        bar.style.backgroundColor = 'var(--green)';
+        let width = 0;
+        clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+            if(width >= 90) clearInterval(progressInterval); 
+            else { width += 5; if(width > 50) width += 1; bar.style.width = width + '%'; }
+        }, 500);
+    }
+
+    function stopFakeProgress(success) {
+        clearInterval(progressInterval);
+        const bar = document.getElementById('progressFill');
+        if(success) {
+            bar.style.width = '100%';
+            setTimeout(() => { document.getElementById('progressBar').style.display = 'none'; }, 500);
+        } else {
+            bar.style.backgroundColor = '#ef4444'; 
+            setTimeout(() => { 
+                document.getElementById('progressBar').style.display = 'none'; 
+                bar.style.width = '0%'; 
+                bar.style.backgroundColor = 'var(--green)';
+            }, 2000);
+        }
+    }
+
     function setUploadState(fileName) {
         const box = document.getElementById('dropZone');
         const txt = document.getElementById('fileNameDisplay');
         const sub = document.getElementById('fileUploadText');
-        
         if(fileName) {
-            box.classList.add('uploaded');
-            txt.innerText = "✅";
-            sub.innerText = fileName;
-            sub.style.color = "#86efac";
-            sub.style.fontWeight = "bold";
+            box.classList.add('uploaded'); txt.innerText = "✅"; sub.innerText = fileName;
+            sub.style.color = "#86efac"; sub.style.fontWeight = "bold";
         } else {
-            box.classList.remove('uploaded');
-            txt.innerText = "📄 / 📷";
-            sub.innerText = "Drag PDF or Image (JPG/PNG)";
-            sub.style.color = "#94a3b8";
-            sub.style.fontWeight = "normal";
+            box.classList.remove('uploaded'); txt.innerText = "📄 / 📷"; sub.innerText = "Drag PDF or Image (JPG/PNG)";
+            sub.style.color = "#94a3b8"; sub.style.fontWeight = "normal";
         }
     }
 
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
-            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
-        }
-        if(localStorage.getItem('eleven_key')) {
-            document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
-            document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
-        }
+        if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
+        if(localStorage.getItem('eleven_key')) document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
@@ -416,17 +458,10 @@
     };
 
     const VOICES_OPENAI = [
-        {id:'nova', name:'Nova (Energetic)'}, 
-        {id:'onyx', name:'Onyx (Announcer)'}, 
-        {id:'alloy', name:'Alloy (Balanced)'}, 
-        {id:'echo', name:'Echo (Soft)'}, 
-        {id:'shimmer', name:'Shimmer (Clear)'}
+        {id:'nova', name:'Nova (Energetic)'}, {id:'onyx', name:'Onyx (Announcer)'}, {id:'alloy', name:'Alloy (Balanced)'}, {id:'echo', name:'Echo (Soft)'}, {id:'shimmer', name:'Shimmer (Clear)'}
     ];
     const VOICES_ELEVEN = [
-        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
-        {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
-        {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
-        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
+        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'}, {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'}, {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
     ];
 
     function updateVoiceOptions() {
@@ -435,20 +470,10 @@
         const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
-
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
-        list.forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = v.id;
-            opt.innerText = v.name;
-            select.appendChild(opt);
-        });
-        
+        list.forEach(v => { const opt = document.createElement('option'); opt.value = v.id; opt.innerText = v.name; select.appendChild(opt); });
         const savedVoice = localStorage.getItem('voice_id_pref');
-        if(savedVoice) {
-            const exists = list.find(v => v.id === savedVoice);
-            if(exists) select.value = savedVoice;
-        }
+        if(savedVoice) { const exists = list.find(v => v.id === savedVoice); if(exists) select.value = savedVoice; }
         localStorage.setItem('engine_pref', engine);
     }
 
@@ -559,7 +584,7 @@
         
         showLoading("Reading File...");
         setStatus("Processing File...", "working");
-        document.getElementById('debugConsole').innerHTML = ""; // Clear log
+        document.getElementById('debugConsole').innerHTML = ""; 
         
         setTimeout(async () => {
             try {
@@ -613,7 +638,9 @@
             
             document.getElementById('dataInput').value = ret.data.text;
             log("Text extracted. Starting Stream Parse...");
-            streamParse(); 
+            
+            if(document.getElementById('useAiParser').checked) await parseWithAI(ret.data.text);
+            else streamParse(); 
 
         } catch(e) { 
             hideLoading();
@@ -634,12 +661,17 @@
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                
-                // Very loose sort to keep order but allow loose spacing
                 const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
-                
-                // Just dump text in approximate order, don't glue too hard
-                items.forEach(d => { fullText += d.str + "\n"; });
+                let lines = [], currentLine = [], lastY = items[0]?.y || 0;
+                items.forEach(d => {
+                    if (Math.abs(d.y - lastY) > 5) {
+                        lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+                        currentLine = []; lastY = d.y;
+                    }
+                    currentLine.push(d);
+                });
+                if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+                fullText += lines.join("\n") + "\n";
             }
             
             if(!fullText.trim()) {
@@ -652,7 +684,9 @@
             document.getElementById('dataInput').value = fullText;
             log(`Extracted ${fullText.length} characters.`);
             log("Starting Stream Parse...");
-            streamParse();
+            
+            if(document.getElementById('useAiParser').checked) await parseWithAI(fullText);
+            else streamParse();
 
         } catch(e) { 
             hideLoading();
@@ -661,15 +695,13 @@
         }
     }
 
-    // --- STREAM PARSER (V57) ---
+    // --- STREAM PARSER (V58 - Multi-Line Headers) ---
     function streamParse() {
         try {
             const raw = document.getElementById('dataInput').value;
             const lines = raw.split('\n');
             let parsedData = [];
             let currentEvent = "Unknown", currentEventName = "", currentHeat = null;
-            
-            // State buffer for fragmented lines
             let pendingLane = null;
             let pendingName = null;
 
@@ -686,55 +718,41 @@
                     let cleanName = evtMatch[2].replace(/\d+:.*/, "").replace(/Heat.*/i, "").trim();
                     if(cleanName.length > 3) currentEventName = cleanName;
                     currentHeat = null;
-                    pendingLane = null; // Reset buffer
+                    pendingLane = null; 
                     continue;
                 }
 
-                // 2. HEAT DETECTION
-                const hMatch = line.match(/Heat\s+(\d+)/i);
+                // 2. HEAT DETECTION (MULTI-LINE)
+                let hMatch = line.match(/Heat\s+(\d+)/i);
+                
+                // Case: "Heat" is one line, "2 of 4" is next line
+                if (line.toLowerCase() === "heat" && i+1 < lines.length) {
+                    const nextLine = lines[i+1].trim();
+                    const multiMatch = nextLine.match(/^(\d+)\s+of/i);
+                    if(multiMatch) hMatch = multiMatch;
+                }
+
                 if(hMatch) {
                     currentHeat = hMatch[1];
-                    pendingLane = null; // Reset buffer
+                    pendingLane = null; 
                     continue;
                 }
 
-                // 3. SWIMMER DETECTION (State Machine)
-                
-                // A) Is this a Lane Number on its own? (e.g. "1")
-                if(line.match(/^\d{1,2}$/)) {
-                    pendingLane = line;
-                    continue;
-                }
+                // 3. SWIMMER FRAGMENT COLLECTOR
+                if(line.match(/^\d{1,2}$/)) { pendingLane = line; continue; }
+                if(pendingLane && !pendingName && line.match(/^[A-Za-z \.-]+$/)) { pendingName = line; continue; }
 
-                // B) Is this a Name? (If we have a lane but no name yet)
-                // Check if it looks like "Lilly P Davidson" (letters, spaces)
-                if(pendingLane && !pendingName && line.match(/^[A-Za-z \.-]+$/)) {
-                    pendingName = line;
-                    continue;
-                }
-
-                // C) Is this "Age Team"? (If we have Lane + Name)
-                // e.g. "11 COHO-IL"
                 if(pendingLane && pendingName) {
-                    // Try to match Age + Team
                     let atMatch = line.match(/^(\d{1,2})\s+(.+)/);
                     if(atMatch) {
                         let age = atMatch[1];
                         let team = atMatch[2];
-                        
-                        // We found Lane, Name, Age, Team. Now we assume next line is Time, or this is it.
-                        // For simplicity in stream parser, we might assume Time is next or just placeholder.
-                        // Let's look ahead one line for Time if possible
                         let time = "NT";
                         if(i+1 < lines.length) {
                             let nextLine = lines[i+1].trim();
-                            if(nextLine.match(/[:\d\.]+|NT|XNT/)) {
-                                time = nextLine;
-                                i++; // Consume next line
-                            }
+                            if(nextLine.match(/[:\d\.]+|NT|XNT/)) { time = nextLine; i++; }
                         }
 
-                        // Commit Swimmer
                         if(!currentHeat) currentHeat = "1";
                         const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
                         const displayTitle = `Event ${currentEvent} - Heat ${currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
@@ -744,14 +762,12 @@
                             heat: currentHeat, lane: pendingLane, place: pendingLane, name: pendingName, age: age, team: team, time: time
                         });
 
-                        // Reset buffers
-                        pendingLane = null;
-                        pendingName = null;
+                        pendingLane = null; pendingName = null;
                         continue;
                     }
                 }
 
-                // D) Standard One-Line Match (Fallback for good PDFs)
+                // 4. STANDARD LINE PARSER
                 let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+)($|\s)/);
                 if(m) {
                     if(!currentHeat) currentHeat = "1";
@@ -775,7 +791,6 @@
                 return 0; 
             }
 
-            // Always overwrite for now to be fast
             heats = {}; heatOrder = [];
             parsedData.forEach(s => {
                 if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
@@ -790,6 +805,85 @@
             hideLoading();
             console.error(e); 
             alert("Parser Error: " + e.message); 
+        }
+    }
+
+    // --- AI PARSING ENGINE ---
+    async function parseWithAI(rawText) {
+        const key = cleanInput(document.getElementById('apiKey').value);
+        if(!key.startsWith('sk-')) { alert("AI Parser requires a valid OpenAI API Key."); return; }
+        
+        startFakeProgress();
+        setStatus("🤖 Sending to AI (This takes ~10-20s)...", "working");
+        
+        const systemPrompt = `You are a data extractor for swimming heat sheets. 
+        Extract data into this JSON format:
+        [
+          {
+            "heatId": "E1-H1",
+            "heatTitle": "Event 1 - Heat 1 (Boys 50 Free)",
+            "event": "1",
+            "eventName": "Boys 50 Free",
+            "heat": "1",
+            "swimmers": [
+               { "lane": "4", "name": "John Doe", "team": "ACME", "age": "12", "time": "23.45" }
+            ]
+          }
+        ]
+        - Group by Heats.
+        - Handle sideways text or messy OCR.
+        - 'XNT' and 'NT' are valid times.
+        - Ignore header junk.
+        - Return ONLY JSON.`;
+
+        try {
+            const r = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini", // Cheap and fast
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: rawText }
+                    ],
+                    temperature: 0
+                })
+            });
+            
+            const json = await r.json();
+            if(json.error) throw new Error(json.error.message);
+            
+            let content = json.choices[0].message.content;
+            content = content.replace(/```json/g, "").replace(/```/g, "");
+            
+            const parsedData = JSON.parse(content);
+            
+            heats = {}; heatOrder = [];
+            parsedData.forEach(h => {
+                if(!heats[h.heatId]) { heats[h.heatId] = { title: h.heatTitle, swimmers: [] }; heatOrder.push(h.heatId); }
+                h.swimmers.forEach(s => {
+                    heats[h.heatId].swimmers.push({ 
+                        ...s, 
+                        heatId: h.heatId,
+                        event: h.event,
+                        eventName: h.eventName,
+                        heat: h.heat,
+                        scratched: false, 
+                        id: `s_${h.heatId}_${s.lane}` 
+                    });
+                });
+            });
+            
+            saveSession();
+            stopFakeProgress(true);
+            setStatus(`AI Found ${heatOrder.length} Heats.`, "ready");
+            switchView('heats');
+
+        } catch(e) {
+            console.error(e);
+            stopFakeProgress(false);
+            alert("AI Parse Failed: " + e.message + "\n\nFalling back to manual parser.");
+            streamParse();
         }
     }
 
@@ -907,25 +1001,18 @@
             if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
             if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
 
-            // Safe Dictionary Parse
             let dict = {};
-            try {
-                dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-            } catch(e) {
-                alert("Dictionary Error: Invalid JSON. Please fix syntax.");
-                return; 
-            }
+            try { dict = JSON.parse(document.getElementById('dictInput').value || "{}"); } 
+            catch(e) { alert("Dictionary Error: Invalid JSON."); return; }
 
             btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
             const template = document.getElementById('modalTemplateInput').value; 
             const introTemplate = document.getElementById('introScriptInput').value;
-            const voice = document.getElementById('voiceSelect').value;
             const forceRegen = document.getElementById('forceRegen').checked;
             const queue = [];
             
             for (const heatKey of heatOrder) {
                 const group = heats[heatKey];
-                // Safety: Skip empty groups
                 if (!group.swimmers || group.swimmers.length === 0) continue;
 
                 const hId = `h_${heatKey}`;
@@ -950,14 +1037,10 @@
             }
 
             const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
-            
             let completed = 0; const total = queue.length;
-            if (total === 0) { 
-                setStatus("Nothing new to generate.", "ready"); 
-                return; 
-            }
+            if (total === 0) { setStatus("Nothing new to generate.", "ready"); return; }
             
-            setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
+            setStatus(`Generating ${total} audio files...`, "working");
 
             async function worker() {
                 while (queue.length > 0) {
@@ -965,13 +1048,9 @@
                     try {
                         let res = null;
                         if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                        else res = await fetchOpenAI(task.text, voice, oaKey);
-                        
+                        else res = await fetchOpenAI(task.text, voiceId, oaKey);
                         if(res) audioCache[task.id] = res;
-                    } catch(e) { 
-                        console.error(e); 
-                        alert(`API Error: ${e.message}`);
-                    }
+                    } catch(e) { console.error(e); alert(`API Error: ${e.message}`); }
                     completed++;
                     document.getElementById('progressFill').style.width = (completed/total*100)+"%";
                 }
@@ -987,9 +1066,7 @@
             console.error(err);
             alert("Crash Prevented: " + err.message);
         } finally {
-            // ALWAYS reset button
-            btn.disabled = false; 
-            btn.innerText = "⚡ GENERATE AUDIO"; 
+            btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; 
         }
     }
 
