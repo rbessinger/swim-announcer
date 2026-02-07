@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer v44.2 (Outro + Time)</title>
+    <title>Swim Announcer v45 (Layout Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -165,6 +165,15 @@
             </div>
 
             <div>
+                <label>PDF Layout</label>
+                <select id="layoutModeSelect" onchange="manualParse()">
+                    <option value="2col">2 Columns (Standard Heat Sheet)</option>
+                    <option value="1col">1 Column (Results / Psych Sheet)</option>
+                </select>
+                <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">Switch this if names are jumbled or out of order.</div>
+            </div>
+
+            <div style="margin-top:10px;">
                 <label>Name Format</label>
                 <select id="nameFormatSelect" onchange="manualParse()">
                     <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
@@ -173,7 +182,7 @@
             </div>
 
             <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; margin-top:15px;">
                     <label style="margin:0;">2. Script Template</label>
                     <button onclick="toggleScriptEditor()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.8rem; font-weight:bold;">✏️ Edit</button>
                 </div>
@@ -268,7 +277,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v44.2 (Outro)</div>
+        <div class="version-tag">v45.0 (Layout Fix)</div>
     </div>
 </div>
 
@@ -314,6 +323,7 @@
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
     let currentAudioObject = null;
+    let currentLayoutMode = '2col'; // Default to standard heat sheet
 
     // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
@@ -521,24 +531,36 @@
     async function handlePdf(file) {
         setStatus("Reading PDF...", "working");
         try {
+            currentLayoutMode = document.getElementById('layoutModeSelect').value;
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             let fullText = "";
+            
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
-                let lines = [], currentLine = [], lastY = items[0]?.y || 0;
-                items.forEach(d => {
-                    if (Math.abs(d.y - lastY) > 5) {
-                        lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
-                        currentLine = []; lastY = d.y;
-                    }
-                    currentLine.push(d);
-                });
-                if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
-                fullText += lines.join("\n") + "\n";
+                const viewport = page.getViewport({ scale: 1 });
+                const midPoint = viewport.width / 2;
+                
+                // Get all text items
+                const items = textContent.items.map(d => ({ 
+                    str: d.str, x: d.transform[4], y: d.transform[5] 
+                }));
+
+                // LAYOUT LOGIC
+                if (currentLayoutMode === '2col') {
+                    // Split Left/Right
+                    const leftItems = items.filter(i => i.x < midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
+                    const rightItems = items.filter(i => i.x >= midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
+                    fullText += processBlock(leftItems) + "\n" + processBlock(rightItems) + "\n";
+                } else {
+                    // 1 Column - Sort mostly by Y (top to bottom)
+                    // We give a small tolerance to Y (5px) so items on "same line" sort by X
+                    items.sort((a,b) => (b.y - a.y) || (a.x - b.x));
+                    fullText += processBlock(items) + "\n";
+                }
             }
+            
             document.getElementById('dataInput').value = fullText;
             const count = manualParse(true); 
             if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
@@ -546,11 +568,27 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
+    function processBlock(items) {
+        let lines = [], currentLine = [], lastY = items[0]?.y || 0;
+        items.forEach(d => {
+            if (Math.abs(d.y - lastY) > 5) {
+                lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+                currentLine = []; lastY = d.y;
+            }
+            currentLine.push(d);
+        });
+        if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+        return lines.join("\n");
+    }
+
     function manualParse(silent = false) {
         try {
             let raw = document.getElementById('dataInput').value;
+            // PRE-CLEAN COMMON OCR ERRORS
             raw = raw.replace(/Club-I1/g, "Club-IL").replace(/Club-1l/g, "Club-IL");
             raw = raw.replace(/(\d{1}):(\d{4})/g, "$1:$2");
+            // Fix merged line issue "7 Name ... 8 Name" -> Split them
+            raw = raw.replace(/(\d+ [A-Za-z, \.-]+ \d{1,2} .+? [\d:.]+) (\d+ [A-Za-z, \.-]+)/g, "$1\n$2");
 
             const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
@@ -579,8 +617,14 @@
                 const hMatch = line.match(/Heat\s+(\d+)/i);
                 if(hMatch) currentHeat = hMatch[1];
 
+                // Regex 1: Heat Sheet (Lane Name Age Team Time)
                 let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-                if (!m) m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+(?:NT|[\d:\.]+)\s+([\d:\.]+).*/i);
+                
+                // Regex 2: Results Sheet (Rank Name Age Team Time1 Time2 Flag)
+                // Relaxed end to catch 'q', 'DQ', etc.
+                if (!m) {
+                     m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+(?:NT|[\d:\.]+)\s+([\d:\.]+).*/i);
+                }
 
                 if(m && currentEvent) {
                     let rawName = m[2].trim();
@@ -613,7 +657,7 @@
                 }
             }
             
-            if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
+            if (parsedData.length === 0) { if(!silent) alert("No swimmers found. Try switching Layout Mode (PDF)."); return 0; }
 
             if (!heats || Object.keys(heats).length === 0 || confirm("Overwrite current list?")) {
                 heats = {}; heatOrder = [];
@@ -625,6 +669,7 @@
                 saveSession();
                 renderBoard();
                 
+                // Auto-switch to Results Template if it looks like results
                 if(parsedData.length > 8 && currentTab !== 3) {
                    if(confirm("This looks like Results data. Switch to Results script mode?")) {
                        switchTab(3);
