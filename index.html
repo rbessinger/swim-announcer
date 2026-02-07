@@ -1,910 +1,1743 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v46 (Fuzzy Logic)</title>
+
+    <title>Swim Announcer Ultimate v44 (Stop Button + 4 Scripts)</title>
+
     
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
+
+
     <style>
+
+        /* --- STABLE V44 LAYOUT --- */
+
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
+
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
         
+
         .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 50; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
+
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
+
         .settings-btn:hover { color: white; transform: rotate(90deg); }
+
+
 
         .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
 
+
+
         .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
+
         .view-section.active { display: flex; }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+
+
         label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; display: block; margin-bottom: 6px; color: #64748b; }
+
         input[type="text"], input[type="password"], textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
+
         input:focus, textarea:focus { border-color: var(--accent); outline: none; }
+
         
+
         input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
+
         .slider-group { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
+
         .slider-val { float: right; color: var(--accent); font-family: monospace; }
 
+
+
         .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; }
+
         .file-upload-box:hover { border-color: var(--accent); }
+
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
+
         input[type="file"] { display: none; }
 
+
+
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
+
         .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; transition: 0.2s; }
+
         .tab-btn:hover { background: #334155; }
+
         .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
 
+
+
         .action-area { padding: 20px; background: #020617; border-top: 1px solid #1e293b; flex-shrink: 0; }
+
         .btn-gen { width: 100%; background: var(--accent); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
         .btn-gen:hover { background: #2563eb; }
+
         .btn-gen:disabled { background: #334155; cursor: not-allowed; opacity: 0.7; }
+
         .btn-gen.dirty { background: var(--orange); animation: pulse 2s infinite; }
+
         
+
         .btn-reset { width: 100%; background: #334155; color: #f87171; border: 1px solid #ef4444; padding: 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-top: 10px; font-weight: bold; }
+
         .btn-reset:hover { background: #450a0a; }
 
+
+
         .btn-parse { background: #334155; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+
         .btn-parse:hover { background: #475569; }
 
+
+
         .checkbox-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+
         .checkbox-row input { width: auto; accent-color: var(--accent); cursor: pointer; }
+
         .checkbox-row span { font-size: 0.8rem; color: #cbd5e1; }
 
+
+
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
+
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
+
+
         /* MAIN DASHBOARD */
+
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
+
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 1000; flex-shrink: 0; }
+
         
+
         .status { font-weight: bold; font-size: 0.9rem; color: #64748b; }
+
         .status.ready { color: var(--green); }
+
         .status.working { color: var(--accent); }
+
         .status.error { color: var(--red); }
+
         .status.stopped { color: var(--red); animation: none; }
 
+
+
         .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; padding-bottom: 140px; }
+
         
+
         .heat-block { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e2e8f0; overflow: hidden; }
+
         .heat-header { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+
         .heat-header:hover { background: #f1f5f9; }
+
         .heat-header.active { background: #eff6ff; color: var(--accent); border-bottom-color: #bfdbfe; border-left: 5px solid var(--accent); }
+
         .heat-title { font-weight: 800; font-size: 1.1rem; color: #475569; }
+
         .heat-badge { font-size: 0.75rem; background: #e2e8f0; padding: 2px 8px; border-radius: 10px; color: #64748b; }
 
+
+
         .swimmer-row { display: flex; align-items: center; padding: 10px 20px; border-bottom: 1px solid #f1f5f9; transition: 0.1s; background: white; }
+
         .swimmer-row:last-child { border-bottom: none; }
+
         .swimmer-row:hover { background: #f8fafc; }
+
         .swimmer-row.active { background: #eff6ff; border-left: 5px solid var(--accent); padding-left: 15px; }
+
         .swimmer-row.dragging { opacity: 0.5; background: #e2e8f0; border: 2px dashed #94a3b8; }
+
         .swimmer-row.scratched { background: #f8fafc; opacity: 0.6; }
+
         .swimmer-row.scratched .name-text { text-decoration: line-through; color: #94a3b8; }
 
+
+
         .col-lane { width: 50px; font-weight: 800; font-size: 1.2rem; color: #cbd5e1; text-align: center; cursor: grab; }
+
         .col-info { flex: 1; padding: 0 15px; }
+
         .name-text { font-weight: 700; color: #334155; font-size: 1.05rem; cursor: text; border-bottom: 1px dashed transparent; }
+
         .name-text:focus { outline: none; border-bottom-color: var(--accent); background: #eff6ff; }
+
         .team-text { font-size: 0.85rem; color: #64748b; margin-top: 2px; }
+
         .col-time { font-family: monospace; font-size: 0.85rem; color: #94a3b8; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; margin-right: 15px; }
+
         
+
         .btn-scratch { padding: 4px 8px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #e2e8f0; background: white; color: #94a3b8; cursor: pointer; transition: 0.2s; font-weight: bold; }
+
         .btn-scratch:hover { border-color: var(--red); color: var(--red); background: #fef2f2; }
+
         .btn-scratch.active { background: var(--red); color: white; border-color: var(--red); }
+
         .audio-dot { width: 8px; height: 8px; border-radius: 50%; background: #e2e8f0; margin-left: 15px; }
+
         .has-audio .audio-dot { background: var(--green); box-shadow: 0 0 4px var(--green); }
 
+
+
         .btn-add-swimmer { width: 100%; border: none; background: #f1f5f9; color: #64748b; padding: 8px; font-size: 0.8rem; cursor: pointer; border-top: 1px solid #e2e8f0; transition: 0.2s; }
+
         .btn-add-swimmer:hover { background: #e2e8f0; color: var(--accent); }
 
+
+
         .go-container { position: absolute; bottom: 30px; right: 30px; width: 120px; height: 120px; z-index: 100; transition: 0.2s; }
+
         .go-container.disabled { opacity: 0.3; pointer-events: none; filter: grayscale(100%); }
+
         
+
         .btn-go { 
+
             width: 100%; height: 100%; border-radius: 50%; border: 4px solid #14532d; 
+
             background: var(--green); color: white; font-weight: 900; font-size: 2rem; 
+
             box-shadow: 0 10px 20px rgba(0,0,0,0.2); cursor: pointer; transition: 0.1s;
+
             display: flex; flex-direction: column; justify-content: center; align-items: center;
+
         }
+
         .btn-go:hover { transform: scale(1.05); background: #16a34a; }
+
         .btn-go:active { transform: scale(0.95); background: #15803d; }
+
         .go-label { font-size: 0.8rem; font-weight: normal; opacity: 0.8; margin-top: -5px; }
 
+
+
         .btn-stop-main {
+
             background: #ef4444; color: white; border: 1px solid #b91c1c; 
+
             padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer;
+
             display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+
         }
+
         .btn-stop-main:hover { background: #dc2626; transform: translateY(1px); }
+
         .btn-stop-main:active { background: #b91c1c; transform: translateY(2px); }
 
+
+
         /* MODALS */
+
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+
         .modal-overlay.active { display: flex; }
+
         .modal-content { background: #0f172a; width: 700px; padding: 30px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative; }
+
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+
         .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
+
         .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
+
         .close-btn:hover { color: white; }
+
         .version-tag { position: absolute; bottom: 15px; right: 20px; font-size: 0.7rem; color: #334155; font-family: monospace; }
+
         .var-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+
         .var-chip { background: #1e293b; color: var(--accent); border: 1px solid #334155; padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-family: monospace; cursor: pointer; transition: 0.2s; font-weight: bold; }
+
         .var-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
 
+
+
     </style>
+
 </head>
+
 <body>
 
+
+
 <div class="sidebar">
+
     <div class="sidebar-header">
+
         <h2 id="sidebarTitle">🏊 RUN SHOW</h2>
+
         <button class="settings-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
+
     </div>
+
     
+
     <div class="scroll-area">
+
         
+
         <div id="viewMain" class="view-section active">
+
             <div>
+
                 <label>1. Upload Meet Program</label>
+
                 <label class="file-upload-box">
+
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">PDF, JPEG, or PNG</div>
+
+                    <div class="file-upload-text">Drag PDF or Image (JPG/PNG)</div>
+
                     <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
+
                 </label>
+
             </div>
 
+
+
             <div>
+
                 <label>Name Format</label>
+
                 <select id="nameFormatSelect" onchange="manualParse()">
-                    <option value="first_last">First Last (e.g. Esmae Shen)</option>
+
                     <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
+
+                    <option value="first_last">First Last (e.g. Esmae Shen)</option>
+
                 </select>
+
             </div>
 
+
+
             <div>
+
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+
                     <label style="margin:0;">2. Script Template</label>
+
                     <button onclick="toggleScriptEditor()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.8rem; font-weight:bold;">✏️ Edit</button>
+
                 </div>
+
                 <div class="template-tabs">
+
                     <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">1. Heats</button>
+
                     <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">2. Finalists</button>
+
                     <button class="tab-btn" id="btnTab3" onclick="switchTab(3)">3. Results</button>
+
                     <button class="tab-btn" id="btnTab4" onclick="switchTab(4)">4. Awards</button>
+
                 </div>
+
                 <textarea id="templatePreview" style="height:60px; opacity:0.7; cursor:pointer;" readonly onclick="toggleScriptEditor()">In lane {lane}, representing {team}, {name}.</textarea>
+
             </div>
 
+
+
             <div>
+
                 <label>3. Select Engine</label>
+
                 <select id="engineSelect" onchange="updateVoiceOptions()" style="margin-bottom:10px;">
+
                     <option value="openai">OpenAI (Fast & Cheap)</option>
+
                     <option value="elevenlabs">ElevenLabs (High Quality)</option>
+
                 </select>
+
+
 
                 <label>Voice Model</label>
+
                 <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;"></select>
+
                 
+
                 <div id="customVoiceDiv" style="display:none; margin-bottom:10px;">
+
                     <label style="color:var(--accent);">Custom Voice ID</label>
+
                     <input type="text" id="customVoiceId" placeholder="Paste ID from ElevenLabs..." onchange="saveConfig()">
+
                 </div>
+
+
 
                 <div class="slider-group">
+
                     <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
+
                     <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
+
                     <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
+
                 </div>
+
+
 
                 <div class="slider-group" style="margin-top:10px;">
+
                     <label>Speaking Speed <span id="speedVal" class="slider-val">1.0</span></label>
+
                     <input type="range" id="speedSlider" min="0.5" max="1.5" step="0.05" value="1.0" oninput="document.getElementById('speedVal').innerText = this.value">
+
                 </div>
+
             </div>
+
         </div>
+
+
 
         <div id="viewSettings" class="view-section">
+
             <div><label>OpenAI API Key</label><input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()"></div>
+
             <div><label>ElevenLabs API Key</label><input type="password" id="elevenKey" placeholder="xi-..." onchange="saveConfig()"></div>
+
             <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea></div>
+
             <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea></div>
+
         </div>
+
     </div>
+
+
 
     <div class="action-area">
+
         <label class="checkbox-row" style="margin-bottom:10px;">
+
             <input type="checkbox" id="forceRegen">
+
             <span>Force Re-Gen</span>
+
         </label>
+
         <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO</span></button>
+
         <button class="btn-reset" onclick="clearSession()">🗑️ CLEAR / NEW MEET</button>
+
         <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+
     </div>
+
 </div>
+
+
 
 <div class="main">
+
     <div class="top-bar">
+
         <div>
+
             <span style="font-weight: bold;">Status:</span> 
-            <span id="statusText" class="status">Waiting for PDF/Image...</span>
+
+            <span id="statusText" class="status">Waiting for PDF...</span>
+
         </div>
+
         <div style="display:flex; align-items:center; gap:20px;">
+
             <button class="btn-stop-main" onclick="stopPlayback()">
+
                 🛑 STOP <span style="font-size:0.7rem; opacity:0.8;">(Esc)</span>
+
             </button>
+
             <div style="font-size: 0.85rem; color: #64748b;">
+
                 <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
+
             </div>
+
         </div>
+
     </div>
+
+
 
     <div class="list-container" id="listContainer">
+
         <div style="text-align:center; color:#94a3b8; margin-top:100px;">
+
             <h3>Welcome to Heat Manager</h3>
-            <p>Upload a Hy-Tek Program (PDF or Photo) to begin.</p>
+
+            <p>Upload a PDF or Image to see heats.</p>
+
         </div>
+
     </div>
+
+
 
     <div class="go-container" id="goBtnContainer">
+
         <button class="btn-go" onclick="triggerGo()">GO<span class="go-label">(Space)</span></button>
+
     </div>
+
 </div>
+
+
 
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) toggleSettings()">
+
     <div class="modal-content">
+
         <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
+
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
+
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
+
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
+
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v46.0 (Fuzzy Logic)</div>
+
+        <div class="version-tag">v44.0 (Stop + 4 Scripts)</div>
+
     </div>
+
 </div>
+
+
 
 <div class="modal-overlay" id="scriptModal" onclick="if(event.target===this) toggleScriptEditor()">
+
     <div class="modal-content" style="width:700px;">
+
         <div class="modal-header"><div class="modal-title">✏️ SCRIPT EDITOR</div><button class="close-btn" onclick="toggleScriptEditor()">&times;</button></div>
+
         <div class="template-tabs" style="margin-bottom:15px;">
+
             <button class="tab-btn active" id="modalTab1" onclick="switchTab(1)">1. Heats</button>
+
             <button class="tab-btn" id="modalTab2" onclick="switchTab(2)">2. Finalists</button>
+
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
+
             <button class="tab-btn" id="modalTab4" onclick="switchTab(4)">4. Awards</button>
+
         </div>
+
         <label>EVENT INTRO SCRIPT</label>
+
         <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
+
         <label>SWIMMER SCRIPT</label>
+
         <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
+
         <div style="margin-top:10px;">
+
             <label>Click to Insert Variable:</label>
+
             <div class="var-chips">
+
                 <div class="var-chip" onclick="insertVar('{event_title}')">{event_title}</div>
+
                 <div class="var-chip" onclick="insertVar('{event}')">{event}</div>
+
                 <div class="var-chip" onclick="insertVar('{event_name}')">{event_name}</div>
+
                 <div class="var-chip" onclick="insertVar('{heat}')">{heat}</div>
+
                 <div class="var-chip" onclick="insertVar('{lane}')">{lane}</div>
+
                 <div class="var-chip" onclick="insertVar('{place}')">{place}</div>
+
                 <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
+
                 <div class="var-chip" onclick="insertVar('{name}')">{name}</div>
+
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
+
             </div>
+
         </div>
+
         <button class="btn-gen" onclick="toggleScriptEditor()" style="margin-top:20px;">DONE</button>
+
     </div>
+
 </div>
 
+
+
 <script>
+
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
+
     let isSettingsOpen = false; let isScriptOpen = false;
-    let currentAudioObject = null;
+
+    let currentAudioObject = null; // Track playing audio for Stop feature
+
+
 
     // --- PHONETIC MEGA PACK ---
+
     const MEGA_DICT = {
+
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
+
     };
+
+
+
+    // --- CLEAN KEY INPUT ---
 
     function cleanInput(str) {
+
         if (!str) return "";
+
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
     }
+
+
 
     window.onload = () => {
+
+        // Init Keys
+
         if(localStorage.getItem('openai_key')) {
+
             document.getElementById('apiKey').value = localStorage.getItem('openai_key');
+
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
+
         }
+
         if(localStorage.getItem('eleven_key')) {
+
             document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
+
             document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
+
         }
+
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
+
         
+
+        // Init Engine
+
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
+
         document.getElementById('engineSelect').value = savedEngine;
+
         updateVoiceOptions();
 
+
+
+        // Init Dict
+
         let savedDict = localStorage.getItem('phonetic_dict');
+
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
+
         document.getElementById('dictInput').value = savedDict;
+
         document.getElementById('dictInputModal').value = savedDict;
 
+
+
+        // Load Session
+
         if(localStorage.getItem('saved_heats')) loadSession();
+
         else loadTemplateUI();
+
         
+
         updateSliders();
+
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
+
     };
+
+
+
+    // --- VOICE OPTIONS ---
 
     const VOICES_OPENAI = [
+
         {id:'nova', name:'Nova (Energetic)'}, 
+
         {id:'onyx', name:'Onyx (Announcer)'}, 
+
         {id:'alloy', name:'Alloy (Balanced)'}, 
+
         {id:'echo', name:'Echo (Soft)'}, 
+
         {id:'shimmer', name:'Shimmer (Clear)'}
+
     ];
+
     const VOICES_ELEVEN = [
+
         {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
+
         {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
+
         {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
+
         {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
+
     ];
+
+
 
     function updateVoiceOptions() {
+
         const engine = document.getElementById('engineSelect').value;
+
         const select = document.getElementById('voiceSelect');
+
         const customDiv = document.getElementById('customVoiceDiv');
+
         select.innerHTML = "";
+
+        
+
+        // Show Custom Voice Field if ElevenLabs
+
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
 
+
+
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
-        list.forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = v.id;
-            opt.innerText = v.name;
-            select.appendChild(opt);
-        });
+
         
+
+        list.forEach(v => {
+
+            const opt = document.createElement('option');
+
+            opt.value = v.id;
+
+            opt.innerText = v.name;
+
+            select.appendChild(opt);
+
+        });
+
+        
+
         const savedVoice = localStorage.getItem('voice_id_pref');
+
         if(savedVoice) {
+
             const exists = list.find(v => v.id === savedVoice);
+
             if(exists) select.value = savedVoice;
+
         }
+
         localStorage.setItem('engine_pref', engine);
+
     }
+
+
+
+    // --- SESSION ---
 
     function saveSession() {
+
         localStorage.setItem('saved_heats', JSON.stringify(heats));
+
         localStorage.setItem('saved_order', JSON.stringify(heatOrder));
+
         setStatus("Session Saved.", "ready");
+
     }
+
     function loadSession() {
+
         try {
+
             heats = JSON.parse(localStorage.getItem('saved_heats'));
+
             heatOrder = JSON.parse(localStorage.getItem('saved_order'));
+
             if(heats && heatOrder) { renderBoard(); setStatus("Restored previous session.", "ready"); }
+
         } catch(e) { console.error(e); }
+
         loadTemplateUI();
+
     }
+
     function clearSession() {
+
         if(confirm("Are you sure? This will delete all current heats.")) {
+
             localStorage.removeItem('saved_heats'); localStorage.removeItem('saved_order'); location.reload();
+
         }
+
     }
+
+
 
     function toggleSettings() {
+
         const modal = document.getElementById('settingsModal');
+
         modal.classList.toggle('active');
+
         document.getElementById('dataInputModal').value = document.getElementById('dataInput').value;
+
     }
+
+
 
     function saveConfig() { 
+
         localStorage.setItem('openai_key', cleanInput(document.getElementById('apiKey').value)); 
+
         localStorage.setItem('eleven_key', cleanInput(document.getElementById('elevenKey').value)); 
+
         localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
+
         localStorage.setItem('custom_voice_id', cleanInput(document.getElementById('customVoiceId').value));
+
     }
+
     function saveConfigFromModal() { 
+
         const oa = cleanInput(document.getElementById('apiKeyModal').value);
+
         const xi = cleanInput(document.getElementById('elevenKeyModal').value);
+
         document.getElementById('apiKey').value = oa; 
+
         document.getElementById('elevenKey').value = xi;
+
         localStorage.setItem('openai_key', oa);
+
         localStorage.setItem('eleven_key', xi);
+
     }
+
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
+
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
+
+
+    // --- TEMPLATES (ADDED 4TH OPTION) ---
+
     const defaultTemplates = { 
+
         1: "In lane {lane}, representing {team}, {name}.", 
+
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
+
         3: "In {place} place, with a time of {time}, from {team}, {name}.",
+
         4: "Presenting the awards for {event_title}. In {place} place, from {team}, {name}."
+
     };
+
     const defaultIntros = { 
+
         1: "Now swimming {event_title}.", 
+
         2: "Ladies and gentlemen, please welcome the finalists for {event_title}.", 
+
         3: "And now, the results for {event_title}.",
+
         4: "Ladies and gentlemen, please welcome our award winners for {event_title}."
+
     };
+
     let currentTab = 1;
 
+
+
     function switchTab(t) { 
+
         currentTab=t; loadTemplateUI(); markDirty(); 
+
         document.querySelectorAll('.tab-btn').forEach((b)=>b.classList.remove('active'));
+
         document.getElementById('btnTab'+t).classList.add('active');
+
         document.getElementById('modalTab'+t).classList.add('active');
+
     }
+
     
+
     function loadTemplateUI() { 
+
         const bodyVal = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
+
         const introVal = localStorage.getItem('intro_'+currentTab) || defaultIntros[currentTab];
+
         document.getElementById('templatePreview').value = bodyVal;
+
         document.getElementById('modalTemplateInput').value = bodyVal;
+
         document.getElementById('introScriptInput').value = introVal;
+
     }
+
     
+
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
+
     function setStatus(msg, type) { const el = document.getElementById('statusText'); el.innerText = msg; el.className = 'status '+type; }
 
+
+
     function updateSliders() {
+
         const hype = document.getElementById('hypeSlider').value;
+
         const labels = ["None", "Excited", "Stadium!"];
+
         document.getElementById('hypeVal').innerText = labels[hype];
+
         markDirty();
+
     }
+
+
 
     function applyHype(text) {
+
         const hype = parseInt(document.getElementById('hypeSlider').value);
+
         if (hype === 0) return text;
+
         if (hype === 1) return text.replace(/\./g, "!") + "!";
+
         if (hype === 2) {
+
             let hText = text.toUpperCase();
+
             hText = hText.replace(/LANE (\d+)/g, "LANE... $1");
+
             hText = hText.replace(/REPRESENTING/g, "REPRESENTING...");
+
             hText = hText.replace(/PLACE/g, "PLACE...");
+
             return hText.replace(/\./g, "!!!") + "!!!";
+
         }
+
         return text;
+
     }
+
+
+
+    // --- FILE HANDLING ---
 
     async function handleFileUpload(input) {
+
         if (!input.files[0]) return;
+
         const file = input.files[0];
+
         setStatus("Processing File...", "working");
+
         const type = file.type.toLowerCase();
+
         
+
         if (type === "application/pdf") handlePdf(file);
+
         else if (type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG.");
+
+        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
+
     }
+
+
 
     async function handleImage(file) {
+
         setStatus("Scanning Image (OCR)...", "working");
+
         try {
+
             const worker = await Tesseract.createWorker('eng');
-            await worker.setParameters({ preserve_interword_spaces: '1' });
+
             const ret = await worker.recognize(file);
+
             await worker.terminate();
-            
-            // Basic OCR cleanup
-            let text = ret.data.text;
-            text = text.replace(/\|/g, " "); // Pipes to spaces
-            text = text.replace(/\s{2,}/g, "   "); // Consolidate spaces
-            
-            document.getElementById('dataInput').value = text;
+
+            document.getElementById('dataInput').value = ret.data.text;
+
             const count = manualParse(true);
-            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed. Try a clearer image."); }
+
+            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed."); }
+
             else setStatus(`Found ${count} swimmers.`, "ready");
+
         } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
+
     }
 
-    // --- PDF PARSER (HY-TEK COLUMN AWARE) ---
+
+
     async function handlePdf(file) {
+
         setStatus("Reading PDF...", "working");
+
         try {
+
             const arrayBuffer = await file.arrayBuffer();
+
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
             let fullText = "";
 
             for (let i = 1; i <= pdf.numPages; i++) {
+
                 const page = await pdf.getPage(i);
+
                 const textContent = await page.getTextContent();
-                
-                // Hy-Tek uses 2 columns. We must separate Left and Right to maintain reading order.
-                const viewport = page.getViewport({ scale: 1 });
-                const midPoint = viewport.width / 2;
 
-                const items = textContent.items.map(d => ({ 
-                    str: d.str, x: d.transform[4], y: d.transform[5] 
-                }));
+                const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
 
-                const leftItems = items.filter(i => i.x < midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
-                const rightItems = items.filter(i => i.x >= midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
+                let lines = [], currentLine = [], lastY = items[0]?.y || 0;
 
-                function processColumn(cols) {
-                    let lines = [];
-                    let currentLine = [];
-                    let lastY = cols[0]?.y || 0;
-                    
-                    cols.forEach(d => {
-                        if (Math.abs(d.y - lastY) > 5) {
-                            lines.push(currentLine.map(o=>o.str).join(" "));
-                            currentLine = [];
-                            lastY = d.y;
-                        }
-                        currentLine.push(d);
-                    });
-                    if(currentLine.length) lines.push(currentLine.map(o=>o.str).join(" "));
-                    return lines.join("\n");
-                }
+                items.forEach(d => {
 
-                fullText += processColumn(leftItems) + "\n" + processColumn(rightItems) + "\n";
+                    if (Math.abs(d.y - lastY) > 5) {
+
+                        lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+
+                        currentLine = []; lastY = d.y;
+
+                    }
+
+                    currentLine.push(d);
+
+                });
+
+                if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+
+                fullText += lines.join("\n") + "\n";
+
             }
-            
+
             document.getElementById('dataInput').value = fullText;
+
             const count = manualParse(true); 
+
             if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
+
             else setStatus(`Found ${count} swimmers.`, "ready");
+
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
+
     }
 
-    // --- FUZZY LOGIC PARSER (THE FIX) ---
+
+
+    // --- PARSER ---
+
     function manualParse(silent = false) {
+
         try {
+
             const raw = document.getElementById('dataInput').value;
+
+            const nameFormat = document.getElementById('nameFormatSelect').value; 
+
             const lines = raw.split('\n');
+
             let parsedData = [];
+
             let currentEvent = "Unknown";
+
             let currentEventName = "";
+
             let currentHeat = null;
 
-            for(let i=0; i<lines.length; i++) {
-                let line = lines[i].trim();
-                if(line.length < 3) continue;
 
-                // 1. Detect Event Header
+
+            for(let i=0; i<lines.length; i++) {
+
+                let line = lines[i].trim();
+
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
+
                 if(evtMatch) {
+
                     currentEvent = evtMatch[1];
-                    currentEventName = evtMatch[2].replace(/Girls|Boys|Women|Men|Mixed/i, "").trim();
-                    currentHeat = null;
+
+                    let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
+
+                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
+
+                } 
+
+                else {
+
+                    const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
+
+                    if(shortEvt) {
+
+                        currentEvent = shortEvt[1];
+
+                        for(let j=1; j<=2; j++) {
+
+                            if (i+j < lines.length) {
+
+                                let nextLine = lines[i+j].trim();
+
+                                if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
+
+                                    currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
+
+                                    break;
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
                 }
 
-                // 2. Detect Heat Header
-                const hMatch = line.match(/Heat\s+(\d+)\s+of/i);
+
+
+                const hMatch = line.match(/Heat\s+(\d+)/i);
+
                 if(hMatch) currentHeat = hMatch[1];
 
-                // 3. FUZZY SCAVENGER
-                // Look for a Team Code (e.g. PAC-IL) as an Anchor
-                const teamMatch = line.match(/\b([A-Z]{2,5}-[A-Z]{2})\b/); // Matches PAC-IL, COHO-IL
-                
-                if (teamMatch && currentHeat) {
-                    // We found a team code. This line is part of a swimmer entry.
-                    // Grab context: Previous line + Current Line + Next Line to handle splits
-                    let prev = (i > 0) ? lines[i-1] : "";
-                    let next = (i < lines.length - 1) ? lines[i+1] : "";
-                    let context = prev + " " + line + " " + next;
-                    
-                    // Scavenge attributes from the context soup
-                    let team = teamMatch[1];
-                    let remaining = context.replace(team, "").trim();
+                if(line.includes("Alternates")) currentHeat = null;
 
-                    // Find Time (digits:digits.digits OR NT/XNT)
-                    let time = "NT";
-                    let timeM = remaining.match(/\b(\d{1,2}:\d{2}\.\d{2}|:?\d{2}\.\d{2}|NT|XNT)\b/i);
-                    if(timeM) {
-                        time = timeM[1].replace(/^:/, ""); // Fix :22.56 issues
-                        remaining = remaining.replace(timeM[0], "").trim();
-                    }
 
-                    // Find Age (11-19) - Look for isolated digits
-                    let age = "";
-                    let ageM = remaining.match(/\b(1[1-9])\b/); 
-                    if(ageM) {
-                        age = ageM[1];
-                        remaining = remaining.replace(new RegExp(`\\b${age}\\b`), "").trim();
-                    }
 
-                    // Find Lane (1-9) - Look for single digit
-                    let lane = "";
-                    let laneM = remaining.match(/\b([1-9])\b/);
-                    if(laneM) {
-                        lane = laneM[1];
-                        remaining = remaining.replace(new RegExp(`\\b${lane}\\b`), "").trim();
-                    }
+                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
 
-                    // Cleanup Name (Remove garbage OCR chars)
-                    // Remove "Heat", "Prelims", common OCR noise like | ] .
-                    let name = remaining.replace(/Heat \d+ of \d+|Prelims|Event \d+|[|\]\[]/gi, "").trim();
-                    // Clean extra spaces
-                    name = name.replace(/\s+/g, " ");
-                    
-                    // Validation: Name must have letters
-                    if (name.match(/[a-zA-Z]{2,}/) && lane) {
-                        // Prevent duplicates (since we read 3 lines of context, we might hit the same swimmer twice)
-                        const uniqueId = `E${currentEvent}-H${currentHeat}-L${lane}`;
-                        const exists = parsedData.find(p => p.uniqueId === uniqueId);
-                        
-                        if(!exists) {
-                            parsedData.push({ 
-                                uniqueId: uniqueId, // Internal dedup key
-                                heatId: `E${currentEvent}-H${currentHeat}`, 
-                                heatTitle: `Event ${currentEvent} - Heat ${currentHeat} (${currentEventName})`, 
-                                event: currentEvent, eventName: currentEventName, 
-                                heat: currentHeat, lane: lane, place: lane, name: name, age: age, team: team, time: time
-                            });
-                        }
-                    }
+                let mode = "heat";
+
+                if(!m) {
+
+                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
+
+                    mode = "result";
+
                 }
+
+
+
+                if(m && (currentHeat || mode === "result")) {
+
+                    let rawName = m[2].trim();
+
+                    let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+
+                    if (nameFormat === 'last_first' && rawName.includes(',')) {
+
+                        const parts = rawName.split(',');
+
+                        if(parts.length >= 2) {
+
+                            let last = parts[0].trim();
+
+                            let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
+
+                            rawName = `${first} ${last}`;
+
+                        }
+
+                    }
+
+                    if(mode === "result" && !currentHeat) currentHeat = "1";
+
+
+
+                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+
+                    const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
+
+                    
+
+                    parsedData.push({ 
+
+                        heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
+
+                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
+
+                        time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
+
+                    });
+
+                }
+
             }
+
             
-            if (parsedData.length === 0) { if(!silent) alert("No swimmers found. Try switching Name Format or checking the file quality."); return 0; }
+
+            if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
+
+
 
             if (!heats || Object.keys(heats).length === 0 || confirm("Overwrite current list?")) {
+
                 heats = {}; heatOrder = [];
+
                 parsedData.forEach(s => {
+
                     if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
+
                     heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
+
                 });
-                heatOrder.sort((a,b) => {
-                    // Smart Sort (E1-H1, E1-H2, E2-H1)
-                    const [eA, hA] = a.replace(/[EH]/g, "").split("-").map(Number);
-                    const [eB, hB] = b.replace(/[EH]/g, "").split("-").map(Number);
-                    return eA - eB || hA - hB;
-                });
+
+                heatOrder.sort(); 
+
                 saveSession();
+
                 renderBoard();
+
             }
+
             return parsedData.length;
+
         } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
+
     }
+
+
 
     function renderBoard() {
+
         const container = document.getElementById('listContainer');
+
         container.innerHTML = "";
+
         if (heatOrder.length === 0) { container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF or Image to begin.</p></div>`; return; }
+
         
+
         heatOrder.forEach(heatKey => {
+
             const group = heats[heatKey];
+
             const swimmers = group.swimmers;
+
             swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
 
+
+
             const heatBlock = document.createElement('div');
+
             heatBlock.className = 'heat-block';
+
             
+
             let headerText = group.title;
+
             const header = document.createElement('div');
+
             header.className = 'heat-header';
+
             header.innerHTML = `<div class="heat-title">${headerText}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
+
             header.onclick = () => selectCue(heatKey, -1);
+
             if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
+
             heatBlock.appendChild(header);
 
+
+
             swimmers.forEach((s, idx) => {
+
                 const row = document.createElement('div');
+
                 row.className = `swimmer-row ${s.scratched ? 'scratched' : ''}`;
+
                 if(currentSelection.heat === heatKey && currentSelection.index === idx) row.classList.add('active');
+
                 if(audioCache[s.id]) row.classList.add('has-audio');
+
                 
+
                 row.draggable = true;
+
                 row.ondragstart = (e) => dragStart(e, heatKey, idx);
+
                 row.ondragover = (e) => e.preventDefault(); 
+
                 row.ondrop = (e) => drop(e, heatKey, idx);
 
+
+
                 row.innerHTML = `<div class="col-lane">${s.lane}</div><div class="col-info"><div class="name-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'name', this)">${s.name}</div><div class="team-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'team', this)">${s.team}</div></div><div class="col-time">${s.time}</div><button class="btn-scratch ${s.scratched?'active':''}" onclick="toggleScratch('${heatKey}', ${idx})">X</button><div class="audio-dot"></div>`;
+
                 row.onclick = (e) => { if(!e.target.isContentEditable && e.target.tagName !== 'BUTTON') selectCue(heatKey, idx); };
+
                 heatBlock.appendChild(row);
+
             });
+
             
+
             const addBtn = document.createElement('button');
+
             addBtn.className = 'btn-add-swimmer';
+
             addBtn.innerText = "+ Add Swimmer";
+
             addBtn.onclick = () => addSwimmer(heatKey);
+
             heatBlock.appendChild(addBtn);
 
+
+
             container.appendChild(heatBlock);
+
         });
+
     }
+
+
 
     function addSwimmer(heatKey) {
+
         const s = { heatId: heatKey, event: "?", heat: "?", lane: "9", name: "New Swimmer", team: "Team", time: "NT", scratched: false, id: `s_${heatKey}_${Date.now()}` };
+
         heats[heatKey].swimmers.push(s); saveSession(); renderBoard();
+
     }
+
+
 
     let dragSrc = null;
+
     function dragStart(e, heat, index) { dragSrc = { heat, index }; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+
     function drop(e, targetHeat, targetIndex) {
+
         e.preventDefault();
+
         if(!dragSrc) return;
+
         const srcList = heats[dragSrc.heat].swimmers;
+
         const swimmer = srcList[dragSrc.index];
+
         srcList.splice(dragSrc.index, 1);
+
         const targetList = heats[targetHeat].swimmers;
+
         swimmer.lane = targetList[targetIndex]?.lane || swimmer.lane; 
+
         targetList.splice(targetIndex, 0, swimmer);
+
         if(srcList.length === 0) delete heats[dragSrc.heat];
+
         dragSrc = null; saveSession(); renderBoard();
+
     }
+
+
 
     function updateData(heat, idx, field, el) { heats[heat].swimmers[idx][field] = el.innerText; saveSession(); markDirty(); }
+
     function toggleScratch(heat, idx) { heats[heat].swimmers[idx].scratched = !heats[heat].swimmers[idx].scratched; saveSession(); renderBoard(); }
+
     function selectCue(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); }
 
+
+
     function toggleScriptEditor() {
+
         isScriptOpen = !isScriptOpen;
+
         const modal = document.getElementById('scriptModal');
+
         modal.classList.toggle('active', isScriptOpen);
+
         if(isScriptOpen) { document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value; document.getElementById('goBtnContainer').classList.add('disabled'); }
+
         else { document.getElementById('goBtnContainer').classList.remove('disabled'); }
+
     }
+
+
 
     function syncScript() {
+
         const bodyVal = document.getElementById('modalTemplateInput').value;
+
         const introVal = document.getElementById('introScriptInput').value;
+
         document.getElementById('templatePreview').value = bodyVal;
+
         localStorage.setItem('t_'+currentTab, bodyVal);
+
         localStorage.setItem('intro_'+currentTab, introVal);
+
         markDirty();
+
     }
+
+
 
     function insertVar(text) {
+
         let el = document.activeElement;
+
         if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
+
         const start = el.selectionStart; const end = el.selectionEnd; const val = el.value;
+
         el.value = val.substring(0, start) + text + val.substring(end);
+
         el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
+
     }
+
+
 
     function getOrdinal(n) {
+
         let s = ["th", "st", "nd", "rd"]; let v = n % 100;
+
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
+
     }
+
+
 
     async function generateAudio() {
+
         const engine = document.getElementById('engineSelect').value;
+
         const oaKey = cleanInput(document.getElementById('apiKey').value);
+
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
+
+        
+
+        // Custom Voice ID Logic
+
         const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+
         let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
 
+
+
         if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+
         if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
 
+
+
         const btn = document.getElementById('btnGenerate');
+
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+
         const template = document.getElementById('modalTemplateInput').value; 
+
         const introTemplate = document.getElementById('introScriptInput').value;
+
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
+
         const voice = document.getElementById('voiceSelect').value;
+
         const forceRegen = document.getElementById('forceRegen').checked;
+
         const queue = [];
+
         
+
         for (const heatKey of heatOrder) {
+
             const group = heats[heatKey];
+
             const hId = `h_${heatKey}`;
+
             
+
             if (forceRegen || !audioCache[hId]) {
+
                 let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+
                 introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+
                 introText = applyHype(introText);
+
                 queue.push({ id: hId, text: introText });
+
             }
+
             for (const s of group.swimmers) {
+
                 if(s.scratched) continue;
+
                 if (forceRegen || !audioCache[s.id]) {
+
                     let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+
                     let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+
                     let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+
                     for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+
                     txt = applyHype(txt);
+
                     queue.push({ id: s.id, text: txt });
+
                 }
+
             }
+
         }
+
+
 
         const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+
         
+
         let completed = 0; const total = queue.length;
+
         if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
+
         setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
 
+
+
         async function worker() {
+
             while (queue.length > 0) {
+
                 const task = queue.shift();
+
                 try {
+
                     let res = null;
+
                     if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+
                     else res = await fetchOpenAI(task.text, voice, oaKey);
+
                     
+
                     if(res) audioCache[task.id] = res;
+
                 } catch(e) { 
+
                     console.error(e); 
+
                     alert(`API Error: ${e.message}`);
+
                 }
+
                 completed++;
+
                 document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+
             }
+
         }
+
         const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+
         await Promise.all(workers);
+
         btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
+
     }
+
+
 
     async function fetchOpenAI(text, voice, key) {
+
         const speed = parseFloat(document.getElementById('speedSlider')?.value || 1.0);
+
         const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: speed }) });
+
         if(!r.ok) throw new Error(`OpenAI ${r.status}`);
+
         return new Audio(URL.createObjectURL(await r.blob()));
+
     }
+
+
 
     async function fetchEleven(text, voiceId, key) {
+
         const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+
             method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
+
             body: JSON.stringify({ 
+
                 text: text, 
+
                 model_id: "eleven_turbo_v2", 
+
                 voice_settings: { stability: 0.5, similarity_boost: 0.75 } 
+
             })
+
         });
+
         if(!r.ok) {
+
             if(r.status === 401) throw new Error("ElevenLabs 401: Invalid Key.");
+
             if(r.status === 429) throw new Error("ElevenLabs 429: Rate Limit. Wait a moment.");
+
             throw new Error(`ElevenLabs ${r.status}`);
+
         }
+
         return new Audio(URL.createObjectURL(await r.blob()));
+
     }
+
+
+
+    // --- STOP PLAYBACK ---
 
     function stopPlayback() {
+
         if(currentAudioObject) {
+
             currentAudioObject.pause();
+
             currentAudioObject.currentTime = 0;
+
             currentAudioObject = null;
+
             setStatus("Playback Stopped.", "stopped");
+
         }
+
     }
+
+
 
     function triggerGo() {
+
         const { heat, index } = currentSelection;
+
         if(heat === null) { if(heatOrder.length > 0) selectCue(heatOrder[0], -1); else return; }
+
         playSelection(); navigate(1);
+
     }
+
+
 
     function playSelection() {
-        stopPlayback();
+
+        stopPlayback(); // Auto-stop previous
+
         const { heat, index } = currentSelection;
+
         let aud = null; let msg = "";
+
         if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
+
         else { const s = heats[heat].swimmers[index]; if(!s.scratched) { aud = audioCache[s.id]; msg = `Announcing Lane ${s.lane}...`; } else { msg = "Skipping Scratched..."; } }
+
         
+
         if(aud) { 
+
             currentAudioObject = aud;
+
             aud.currentTime=0; 
+
             aud.play(); 
+
             setStatus(msg, "working"); 
+
         } else setStatus("No Audio Generated.", "working");
+
     }
+
+
 
     document.addEventListener('keydown', (e) => {
+
         if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+
         if(!heats || Object.keys(heats).length === 0) return;
+
         if(e.code === 'Space') { e.preventDefault(); triggerGo(); } 
+
         else if(e.code === 'Escape') { e.preventDefault(); stopPlayback(); }
+
         else if(e.code === 'ArrowDown') navigate(1); else if(e.code === 'ArrowUp') navigate(-1);
+
     });
 
+
+
     function navigate(dir) {
+
         let flatMap = [];
+
         heatOrder.forEach(h => { flatMap.push({ heat: h, index: -1 }); heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); }); });
+
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
+
         if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
+
         if(currIdx >= 0 && currIdx < flatMap.length) { currentSelection = flatMap[currIdx]; renderBoard(); const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); }
+
     }
+
 </script>
+
 </body>
+
 </html>
