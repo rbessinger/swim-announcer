@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v36 (Engine Fix)</title>
+    <title>Swim Announcer Ultimate v37 (Custom Voice)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -141,6 +141,7 @@
     </div>
     
     <div class="scroll-area">
+        
         <div id="viewMain" class="view-section active">
             <div>
                 <label>1. Upload Meet Program</label>
@@ -175,13 +176,18 @@
             <div>
                 <label>3. Voice Engine</label>
                 <select id="engineSelect" onchange="updateVoiceOptions()" style="margin-bottom:10px;">
-                    <option value="openai">OpenAI (Default)</option>
-                    <option value="elevenlabs">ElevenLabs (Best Quality)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="elevenlabs">ElevenLabs</option>
                 </select>
 
                 <label>Voice Model</label>
                 <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
                     </select>
+                
+                <div id="customVoiceDiv" style="display:none; margin-bottom:10px;">
+                    <label style="color:var(--accent);">Custom Voice ID</label>
+                    <input type="text" id="customVoiceId" placeholder="Paste ID from ElevenLabs..." onchange="saveConfig()">
+                </div>
 
                 <div class="slider-group">
                     <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
@@ -204,7 +210,7 @@
             <input type="checkbox" id="forceRegen">
             <span>Force Re-Gen</span>
         </label>
-        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO</span></button>
+        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO (TURBO)</span></button>
         <button class="btn-reset" onclick="clearSession()">🗑️ CLEAR / NEW MEET</button>
         <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
     </div>
@@ -238,9 +244,9 @@
         <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
-        <div><label>Phonetic Dictionary</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
-        <div><label style="color:var(--orange);">Raw Data</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse</button></div>
-        <div class="version-tag">v36.0 (Multi-Engine Fixed)</div>
+        <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
+        <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
+        <div class="version-tag">v37.0 (API Fix)</div>
     </div>
 </div>
 
@@ -293,6 +299,7 @@
             document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
             document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
         }
+        if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
         // Init Engine
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
@@ -305,7 +312,7 @@
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
-        // Init Session
+        // Load Session
         if(localStorage.getItem('saved_heats')) loadSession();
         else loadTemplateUI();
         
@@ -327,8 +334,12 @@
     function updateVoiceOptions() {
         const engine = document.getElementById('engineSelect').value;
         const select = document.getElementById('voiceSelect');
+        const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
         
+        // Show Custom Voice Field if ElevenLabs
+        customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
+
         const list = engine === 'elevenlabs' ? VOICES_ELEVEN : VOICES_OPENAI;
         list.forEach(v => {
             const opt = document.createElement('option');
@@ -375,6 +386,7 @@
         localStorage.setItem('openai_key', document.getElementById('apiKey').value); 
         localStorage.setItem('eleven_key', document.getElementById('elevenKey').value); 
         localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
+        localStorage.setItem('custom_voice_id', document.getElementById('customVoiceId').value);
     }
     function saveConfigFromModal() { 
         const oa = document.getElementById('apiKeyModal').value;
@@ -496,8 +508,6 @@
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
-                
-                // Event Detection
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
@@ -520,12 +530,10 @@
                     }
                 }
 
-                // Heat Detection
                 const hMatch = line.match(/Heat\s+(\d+)/i);
                 if(hMatch) currentHeat = hMatch[1];
                 if(line.includes("Alternates")) currentHeat = null;
 
-                // Swimmer Detection
                 let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
                 let mode = "heat";
                 if(!m) {
@@ -675,12 +683,15 @@
     }
 
     async function generateAudio() {
-        // Validation based on Engine
         const engine = document.getElementById('engineSelect').value;
         const oaKey = document.getElementById('apiKey').value;
         const xiKey = document.getElementById('elevenKey').value;
+        
+        // Custom Voice ID Logic
+        const customVoiceId = document.getElementById('customVoiceId').value;
+        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
 
-        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key."); toggleSettings(); return; }
+        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
         if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
 
         const btn = document.getElementById('btnGenerate');
@@ -688,7 +699,6 @@
         const template = document.getElementById('modalTemplateInput').value; 
         const introTemplate = document.getElementById('introScriptInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-        const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
         const queue = [];
         
@@ -723,11 +733,14 @@
                 const task = queue.shift();
                 try {
                     let res = null;
-                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voice, xiKey);
-                    else res = await fetchOpenAI(task.text, voice, oaKey);
+                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                    else res = await fetchOpenAI(task.text, voiceId, oaKey);
                     
                     if(res) audioCache[task.id] = res;
-                } catch(e) { console.error(e); }
+                } catch(e) { 
+                    console.error(e); 
+                    alert("API Error: " + e.message); // Explicit Alert
+                }
                 completed++;
                 document.getElementById('progressFill').style.width = (completed/total*100)+"%";
             }
@@ -739,7 +752,8 @@
 
     async function fetchOpenAI(text, voice, key) {
         const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: 1.0 }) });
-        if(r.ok) return new Audio(URL.createObjectURL(await r.blob())); return null;
+        if(!r.ok) throw new Error(`OpenAI Error: ${r.status}`);
+        return new Audio(URL.createObjectURL(await r.blob()));
     }
 
     async function fetchEleven(text, voiceId, key) {
@@ -747,7 +761,8 @@
             method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
             body: JSON.stringify({ text: text, model_id: "eleven_monolingual_v1", voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
         });
-        if(r.ok) return new Audio(URL.createObjectURL(await r.blob())); return null;
+        if(!r.ok) throw new Error(`ElevenLabs Error: ${r.status}`);
+        return new Audio(URL.createObjectURL(await r.blob()));
     }
 
     function triggerGo() {
