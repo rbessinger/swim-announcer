@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v40 (Google + SSML Tuning)</title>
+    <title>Swim Announcer Ultimate v41 (Google Fixed)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V40 LAYOUT --- */
+        /* --- STABLE V41 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -258,7 +258,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v40.0 (Tuning & SSML)</div>
+        <div class="version-tag">v41.0 (Fixed Symbols)</div>
     </div>
 </div>
 
@@ -308,6 +308,17 @@
     function cleanInput(str) {
         if (!str) return "";
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    }
+
+    // --- ESCAPE XML (FIX FOR & SYMBOLS) ---
+    function escapeXML(str) {
+        if(!str) return "";
+        return str.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
     }
 
     window.onload = () => {
@@ -747,18 +758,30 @@
         for (const heatKey of heatOrder) {
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
+            
+            // Clean dynamic values for SSML safety
+            let sEventTitle = escapeXML(`Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+            let sEvent = escapeXML(group.swimmers[0].event);
+            let sEventName = escapeXML(group.swimmers[0].eventName);
+            let sHeat = escapeXML(group.swimmers[0].heat);
+
             if (forceRegen || !audioCache[hId]) {
-                let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                let introText = introTemplate.replace(/{event_title}/g, sEventTitle);
+                introText = introText.replace(/{event}/g, sEvent).replace(/{event_name}/g, sEventName).replace(/{heat}/g, sHeat);
                 introText = applyHype(introText);
                 queue.push({ id: hId, text: introText });
             }
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
-                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                    // Safe Variables for SSML
+                    let vEventTitle = escapeXML(`Event ${s.event}, ${s.eventName}, Heat ${s.heat}`);
+                    let vTeam = escapeXML(s.team);
+                    let vName = escapeXML(s.name);
+                    let vEventName = escapeXML(s.eventName);
+                    
                     let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+                    let txt = template.replace(/{event_title}/g, vEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, vEventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, vTeam).replace(/{name}/g, vName).replace(/{time}/g, s.time);
                     for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
                     txt = applyHype(txt);
                     queue.push({ id: s.id, text: txt });
@@ -812,7 +835,7 @@
     async function fetchGoogle(text, voiceId, key) {
         const speed = parseFloat(document.getElementById('speedSlider')?.value || 1.0);
         const pitch = parseFloat(document.getElementById('pitchSlider')?.value || 0.0);
-        // Wrap text in <speak> to enable SSML
+        // Wrap in <speak> and handle newlines as breaks
         const ssmlText = `<speak>${text.replace(/\n/g, '<break time="500ms"/>')}</speak>`;
 
         const r = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${key}`, {
