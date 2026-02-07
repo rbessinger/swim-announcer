@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer v47 (Hy-Tek Multi-Mode)</title>
+    <title>Swim Announcer v49 (Blob Hunter Engine)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -295,7 +295,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v47.0 (Hy-Tek Multi-Mode)</div>
+        <div class="version-tag">v49.0 (Blob Hunter)</div>
     </div>
 </div>
 
@@ -341,11 +341,9 @@
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
     let currentAudioObject = null;
+    let currentLayoutMode = '2col'; 
 
-    // --- PHONETIC MEGA PACK ---
-    const MEGA_DICT = {
-        "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
-    };
+    const MEGA_DICT = { "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe" };
 
     function cleanInput(str) {
         if (!str) return "";
@@ -379,19 +377,8 @@
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
-    const VOICES_OPENAI = [
-        {id:'nova', name:'Nova (Energetic)'}, 
-        {id:'onyx', name:'Onyx (Announcer)'}, 
-        {id:'alloy', name:'Alloy (Balanced)'}, 
-        {id:'echo', name:'Echo (Soft)'}, 
-        {id:'shimmer', name:'Shimmer (Clear)'}
-    ];
-    const VOICES_ELEVEN = [
-        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
-        {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
-        {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
-        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
-    ];
+    const VOICES_OPENAI = [ {id:'nova', name:'Nova (Energetic)'}, {id:'onyx', name:'Onyx (Announcer)'}, {id:'alloy', name:'Alloy (Balanced)'}, {id:'echo', name:'Echo (Soft)'}, {id:'shimmer', name:'Shimmer (Clear)'} ];
+    const VOICES_ELEVEN = [ {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'}, {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'}, {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'} ];
 
     function updateVoiceOptions() {
         const engine = document.getElementById('engineSelect').value;
@@ -399,21 +386,10 @@
         const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
-
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
-        
-        list.forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = v.id;
-            opt.innerText = v.name;
-            select.appendChild(opt);
-        });
-        
+        list.forEach(v => { const opt = document.createElement('option'); opt.value = v.id; opt.innerText = v.name; select.appendChild(opt); });
         const savedVoice = localStorage.getItem('voice_id_pref');
-        if(savedVoice) {
-            const exists = list.find(v => v.id === savedVoice);
-            if(exists) select.value = savedVoice;
-        }
+        if(savedVoice) { const exists = list.find(v => v.id === savedVoice); if(exists) select.value = savedVoice; }
         localStorage.setItem('engine_pref', engine);
     }
 
@@ -471,11 +447,7 @@
         3: "And now, the results for {event_title}.",
         4: "Ladies and gentlemen, please welcome our award winners for {event_title}."
     };
-    const defaultOutros = {
-        1: "", 2: "", 
-        3: "The time is now {current_time}. Scratches are due by {scratch_deadline}.",
-        4: ""
-    };
+    const defaultOutros = { 1: "", 2: "", 3: "The time is now {current_time}. Scratches are due by {scratch_deadline}.", 4: "" };
 
     let currentTab = 1;
 
@@ -490,7 +462,6 @@
         const bodyVal = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
         const introVal = localStorage.getItem('intro_'+currentTab) || defaultIntros[currentTab];
         const outroVal = localStorage.getItem('outro_'+currentTab) || defaultOutros[currentTab];
-        
         document.getElementById('templatePreview').value = bodyVal;
         document.getElementById('modalTemplateInput').value = bodyVal;
         document.getElementById('introScriptInput').value = introVal;
@@ -526,7 +497,6 @@
         const file = input.files[0];
         setStatus("Processing File...", "working");
         const type = file.type.toLowerCase();
-        
         if (type === "application/pdf") handlePdf(file);
         else if (type.startsWith("image/")) handleImage(file);
         else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
@@ -552,28 +522,22 @@
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             let fullText = "";
-            
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
                 const viewport = page.getViewport({ scale: 1 });
                 const midPoint = viewport.width / 2;
-                
                 const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] }));
 
-                // --- BIFURCATED PDF EXTRACTION ---
                 if (currentLayoutMode === 'heat2col') {
-                    // Split Left/Right for standard heat sheets
                     const leftItems = items.filter(i => i.x < midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
                     const rightItems = items.filter(i => i.x >= midPoint).sort((a,b) => b.y - a.y || a.x - b.x);
                     fullText += processBlock(leftItems) + "\n" + processBlock(rightItems) + "\n";
                 } else {
-                    // 1 Column (Results) - Sort strictly top to bottom
                     items.sort((a,b) => (b.y - a.y) || (a.x - b.x));
                     fullText += processBlock(items) + "\n";
                 }
             }
-            
             document.getElementById('dataInput').value = fullText;
             const count = manualParse(true); 
             if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("No swimmers found. Did you select the correct Hy-Tek format?"); }
@@ -598,90 +562,88 @@
         try {
             const currentLayoutMode = document.querySelector('input[name="hytekMode"]:checked').value;
             let raw = document.getElementById('dataInput').value;
-            
-            // --- PRE-CLEANING ---
-            raw = raw.replace(/Club-I1/g, "Club-IL").replace(/Club-1l/g, "Club-IL");
-            raw = raw.replace(/(\d{1}):(\d{4})/g, "$1:$2"); // Fix OCR time errors
-            // CRITICAL: Split merged lines in 1-column reports (e.g. "7 Name... 8 Name...")
-            if (currentLayoutMode === 'result1col') {
-                 raw = raw.replace(/(\d+ [A-Za-z, \.-]+ \d{1,2} .+? (?:NT|[\d:.]+).*?) (\d+ [A-Za-z, \.-]+)/g, "$1\n$2");
-            }
-
             const nameFormat = document.getElementById('nameFormatSelect').value; 
-            const lines = raw.split('\n');
+            
             let parsedData = [];
             let currentEvent = "Unknown";
             let currentEventName = "";
             let currentHeat = null;
 
-            for(let i=0; i<lines.length; i++) {
-                let line = lines[i].trim();
-                if(line.length < 5) continue;
-
-                // --- EVENT DETECTION (Common to both modes) ---
-                const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
-                if(evtMatch) {
-                    currentEvent = evtMatch[1];
-                    let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name|Team/i)) currentEventName = rawName;
-                    currentHeat = "1"; // Reset heat
-                } else {
-                    const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
-                    if(shortEvt) { currentEvent = shortEvt[1]; currentHeat = "1"; }
+            // --- STRATEGY 1: BLOB HUNTER (For 1-Column Results/Psych) ---
+            if (currentLayoutMode === 'result1col') {
+                // Nuclear Flatten: Remove ALL newlines and collapse spaces
+                let blob = raw.replace(/[\r\n]+/g, " ").replace(/\s{2,}/g, " ");
+                
+                // Extract Event Title
+                const evtMatch = blob.match(/(?:Event|Evt)\s*(\d+)\s+(.*?)(?=\s+Lane|\s+Name|\s+Heat|\s+Rank|$)/i);
+                if(evtMatch) { 
+                    currentEvent = evtMatch[1]; 
+                    currentEventName = evtMatch[2].replace(/Girls|Boys/i, "").trim(); 
                 }
+                currentHeat = "1";
 
-                // --- HEAT DETECTION (Mostly for 2-col mode) ---
-                const hMatch = line.match(/Heat\s+(\d+)/i);
-                if(hMatch) currentHeat = hMatch[1];
+                // Regex to find: Rank (1-2 digits) -> Name -> Age (1-2 digits) -> Team (UPPER) -> Time
+                // Matches "2 Lapkouski, Ignat A 14 Patriot Aquatic Club-IL 2:11.35"
+                const regex = /(\d{1,2})\s+([A-Za-z',\.\-\s]+?)\s+(\d{1,2})\s+([A-Z0-9\s-]+?)\s+((?:NT|XNT|[\d:\.]+\s*)+)/g;
+                
+                let m;
+                while ((m = regex.exec(blob)) !== null) {
+                    let lanePlace = m[1];
+                    let rawName = m[2].trim();
+                    let ageVal = m[3];
+                    let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+                    let timeBlob = m[5].trim().split(/\s+/);
+                    let timeVal = timeBlob[timeBlob.length-1].toUpperCase(); // Take last time
 
-                let m = null;
-                let rawName, rawTeam, timeVal, lanePlace, ageVal;
+                    // Filter out garbage matches where "Name" is just a flag like "q"
+                    if (rawName.length < 3) continue;
 
-                // --- BIFURCATED PARSING LOGIC ---
-                if (currentLayoutMode === 'heat2col') {
-                    // >>> MODE 1: 2-COLUMN HEAT SHEET (Lane starts line) <<<
-                    // Regex: Lane | Name | Age | Team | Time
-                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-                    if (m) {
-                        lanePlace = m[1]; rawName = m[2]; ageVal = m[3]; rawTeam = m[4]; timeVal = m[5];
-                    }
-                } else {
-                    // >>> MODE 2: 1-COLUMN RESULTS/PSYCH (Rank starts line) <<<
-                    // Regex: Rank | Name | Age | Team | Time(s) | Flags
-                    // This regex is greedy for times to catch Prelim+Final times, then takes the last one.
-                    m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+((?:NT|[\d:\.]+\s*)+).*$/i);
-                    if (m) {
-                        lanePlace = m[1]; rawName = m[2]; ageVal = m[3]; rawTeam = m[4];
-                        // Handle multiple times (take the last one found)
-                        let times = m[5].trim().split(/\s+/);
-                        timeVal = times[times.length-1];
-                    }
-                }
-
-                // --- COMMON DATA PROCESSING ---
-                if(m && currentEvent) {
-                    rawName = rawName.trim();
-                    rawTeam = rawTeam.trim().replace(/-[A-Z]{2}$/, ""); // Remove state suffix if present
-                    
                     if (nameFormat === 'last_first' && rawName.includes(',')) {
                         const parts = rawName.split(',');
-                        if(parts.length >= 2) {
-                            rawName = `${parts[1].trim().replace(/\s+[A-Z]\.?$/, "")} ${parts[0].trim()}`;
-                        }
+                        if(parts.length >= 2) rawName = `${parts[1].trim().replace(/\s+[A-Z]\.?$/, "")} ${parts[0].trim()}`;
                     }
 
-                    if(!currentHeat) currentHeat = "1";
-                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                    const displayTitle = `Event ${currentEvent} - ${currentEventName}`;
-                    
-                    timeVal = timeVal.toUpperCase();
-                    if(timeVal.match(/^\d:\d{4}$/)) timeVal = timeVal.slice(0, 4) + "." + timeVal.slice(4); // OCR Fix
-
+                    const uniqueHeatId = `E${currentEvent}-H1`;
                     parsedData.push({ 
-                        heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
-                        heat: currentHeat, lane: lanePlace, place: lanePlace, name: rawName, age: ageVal, team: rawTeam, 
-                        time: timeVal
+                        heatId: uniqueHeatId, heatTitle: `Event ${currentEvent} - ${currentEventName}`, event: currentEvent, eventName: currentEventName, 
+                        heat: "1", lane: lanePlace, place: lanePlace, name: rawName, age: ageVal, team: rawTeam, time: timeVal
                     });
+                }
+
+            } else {
+                // --- STRATEGY 2: LINE-BY-LINE (For 2-Column Heat Sheets) ---
+                raw = raw.replace(/Club-I1/g, "Club-IL"); // Basic clean
+                const lines = raw.split('\n');
+                
+                for(let i=0; i<lines.length; i++) {
+                    let line = lines[i].trim();
+                    if(line.length < 5) continue;
+
+                    const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
+                    if(evtMatch) {
+                        currentEvent = evtMatch[1];
+                        let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
+                        if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name|Team/i)) currentEventName = rawName;
+                    } 
+                    const hMatch = line.match(/Heat\s+(\d+)/i);
+                    if(hMatch) currentHeat = hMatch[1];
+
+                    // Lane | Name | Age | Team | Time
+                    let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                    
+                    if(m && currentEvent) {
+                        let lanePlace = m[1]; let rawName = m[2].trim(); let ageVal = m[3]; let rawTeam = m[4].trim(); let timeVal = m[5];
+                        if (nameFormat === 'last_first' && rawName.includes(',')) {
+                            const parts = rawName.split(',');
+                            if(parts.length >= 2) rawName = `${parts[1].trim().replace(/\s+[A-Z]\.?$/, "")} ${parts[0].trim()}`;
+                        }
+                        if(!currentHeat) currentHeat = "1";
+                        const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+                        parsedData.push({ 
+                            heatId: uniqueHeatId, heatTitle: `Event ${currentEvent} - ${currentEventName}`, event: currentEvent, eventName: currentEventName, 
+                            heat: currentHeat, lane: lanePlace, place: lanePlace, name: rawName, age: ageVal, team: rawTeam, time: timeVal
+                        });
+                    }
                 }
             }
             
@@ -693,7 +655,6 @@
                     if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
                     heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
                 });
-                // Sort Heats intelligently (E1H1, E1H2, E2H1...)
                 heatOrder.sort((a,b) => {
                      const [eA, hA] = a.replace(/[EH]/g, "").split("-").map(Number);
                      const [eB, hB] = b.replace(/[EH]/g, "").split("-").map(Number);
@@ -701,13 +662,6 @@
                 });
                 saveSession();
                 renderBoard();
-                
-                // Auto-switch tab based on mode
-                if (currentLayoutMode === 'result1col' && currentTab !== 3) {
-                   if(confirm("Switched to Results Mode. Change script template to Results?")) switchTab(3);
-                } else if (currentLayoutMode === 'heat2col' && currentTab !== 1) {
-                   if(confirm("Switched to Heat Sheet Mode. Change script template to Heats?")) switchTab(1);
-                }
             }
             return parsedData.length;
         } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
@@ -721,7 +675,6 @@
         heatOrder.forEach(heatKey => {
             const group = heats[heatKey];
             const swimmers = group.swimmers;
-            // Sort by Lane/Rank
             swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
 
             const heatBlock = document.createElement('div');
@@ -757,7 +710,6 @@
             addBtn.onclick = () => addSwimmer(heatKey);
             heatBlock.appendChild(addBtn);
 
-            // Outro Footer
             const footer = document.createElement('div');
             footer.className = 'heat-footer';
             if(currentSelection.heat === heatKey && currentSelection.index === -2) footer.classList.add('active');
@@ -805,7 +757,6 @@
         const bodyVal = document.getElementById('modalTemplateInput').value;
         const introVal = document.getElementById('introScriptInput').value;
         const outroVal = document.getElementById('outroScriptInput').value;
-        
         document.getElementById('templatePreview').value = bodyVal;
         localStorage.setItem('t_'+currentTab, bodyVal);
         localStorage.setItem('intro_'+currentTab, introVal);
@@ -815,9 +766,7 @@
 
     function insertVar(text) {
         let el = document.activeElement;
-        // Default to swimmer script if focus is lost or elsewhere
         if(['modalTemplateInput','introScriptInput','outroScriptInput'].indexOf(el.id) === -1) el = document.getElementById('modalTemplateInput');
-        
         const start = el.selectionStart; const end = el.selectionEnd; const val = el.value;
         el.value = val.substring(0, start) + text + val.substring(end);
         el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
@@ -855,16 +804,14 @@
         const forceRegen = document.getElementById('forceRegen').checked;
         const queue = [];
         
-        // Calculate Times
         const nowStr = getClockTime(0);
         const dueStr = getClockTime(30);
 
         for (const heatKey of heatOrder) {
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
-            const oId = `o_${heatKey}`; // Outro ID
+            const oId = `o_${heatKey}`;
             
-            // INTRO
             if (forceRegen || !audioCache[hId]) {
                 let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
                 introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
@@ -872,7 +819,6 @@
                 if(introText.trim()) queue.push({ id: hId, text: introText });
             }
             
-            // SWIMMERS
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
@@ -885,11 +831,9 @@
                 }
             }
 
-            // OUTRO
             if (forceRegen || !audioCache[oId]) {
                 if(outroTemplate.trim()) {
                     let outroText = outroTemplate.replace(/{current_time}/g, nowStr).replace(/{scratch_deadline}/g, dueStr);
-                    // Standard vars also avail in outro
                     outroText = outroText.replace(/{event_title}/g, `Event ${group.swimmers[0].event}`).replace(/{event}/g, group.swimmers[0].event);
                     outroText = applyHype(outroText);
                     queue.push({ id: oId, text: outroText });
@@ -898,7 +842,6 @@
         }
 
         const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
-        
         let completed = 0; const total = queue.length;
         if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); renderBoard(); return; }
         setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
@@ -910,12 +853,8 @@
                     let res = null;
                     if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
                     else res = await fetchOpenAI(task.text, voice, oaKey);
-                    
                     if(res) audioCache[task.id] = res;
-                } catch(e) { 
-                    console.error(e); 
-                    alert(`API Error: ${e.message}`);
-                }
+                } catch(e) { console.error(e); alert(`API Error: ${e.message}`); }
                 completed++;
                 document.getElementById('progressFill').style.width = (completed/total*100)+"%";
             }
@@ -935,28 +874,14 @@
     async function fetchEleven(text, voiceId, key) {
         const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
             method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                text: text, 
-                model_id: "eleven_turbo_v2", 
-                voice_settings: { stability: 0.5, similarity_boost: 0.75 } 
-            })
+            body: JSON.stringify({ text: text, model_id: "eleven_turbo_v2", voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
         });
-        if(!r.ok) {
-            if(r.status === 401) throw new Error("ElevenLabs 401: Invalid Key.");
-            if(r.status === 429) throw new Error("ElevenLabs 429: Rate Limit. Wait a moment.");
-            throw new Error(`ElevenLabs ${r.status}`);
-        }
+        if(!r.ok) throw new Error(`ElevenLabs ${r.status}`);
         return new Audio(URL.createObjectURL(await r.blob()));
     }
 
-    // --- STOP PLAYBACK ---
     function stopPlayback() {
-        if(currentAudioObject) {
-            currentAudioObject.pause();
-            currentAudioObject.currentTime = 0;
-            currentAudioObject = null;
-            setStatus("Playback Stopped.", "stopped");
-        }
+        if(currentAudioObject) { currentAudioObject.pause(); currentAudioObject.currentTime = 0; currentAudioObject = null; setStatus("Playback Stopped.", "stopped"); }
     }
 
     function triggerGo() {
@@ -966,34 +891,17 @@
     }
 
     function playSelection() {
-        stopPlayback(); // Auto-stop previous
+        stopPlayback();
         const { heat, index } = currentSelection;
         let aud = null; let msg = "";
         
-        if(index === -1) { 
-            aud = audioCache[`h_${heat}`]; 
-            msg = `Announcing ${heats[heat].title}...`; 
-        }
-        else if(index === -2) { 
-            aud = audioCache[`o_${heat}`]; 
-            msg = `Announcing Outro...`; 
-        }
-        else { 
-            const s = heats[heat].swimmers[index]; 
-            if(!s.scratched) { aud = audioCache[s.id]; msg = `Announcing Lane ${s.lane}...`; } 
-            else { msg = "Skipping Scratched..."; } 
-        }
+        if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
+        else if(index === -2) { aud = audioCache[`o_${heat}`]; msg = `Announcing Outro...`; }
+        else { const s = heats[heat].swimmers[index]; if(!s.scratched) { aud = audioCache[s.id]; msg = `Announcing Lane ${s.lane}...`; } else { msg = "Skipping Scratched..."; } }
         
-        if(aud) { 
-            currentAudioObject = aud;
-            aud.currentTime=0; 
-            aud.play(); 
-            setStatus(msg, "working"); 
-        } else if (msg.includes("Skipping")) {
-            // pass
-        } else {
-            setStatus("No Audio Generated.", "working");
-        }
+        if(aud) { currentAudioObject = aud; aud.currentTime=0; aud.play(); setStatus(msg, "working"); }
+        else if (msg.includes("Skipping")) { /* pass */ }
+        else { setStatus("No Audio Generated.", "working"); }
     }
 
     document.addEventListener('keydown', (e) => {
@@ -1007,19 +915,17 @@
     function navigate(dir) {
         let flatMap = [];
         heatOrder.forEach(h => { 
-            flatMap.push({ heat: h, index: -1 }); // Intro
+            flatMap.push({ heat: h, index: -1 });
             heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
-            flatMap.push({ heat: h, index: -2 }); // Outro
+            flatMap.push({ heat: h, index: -2 });
         });
         
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
         if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
         
         if(currIdx >= 0 && currIdx < flatMap.length) { 
-            currentSelection = flatMap[currIdx]; 
-            renderBoard(); 
-            const el = document.querySelector('.active'); 
-            if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); 
+            currentSelection = flatMap[currIdx]; renderBoard(); 
+            const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); 
         }
     }
 </script>
