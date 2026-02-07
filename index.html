@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v53 (AI Parser Added)</title>
+    <title>Swim Announcer Ultimate v54 (AI Status Bar)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V53 LAYOUT --- */
+        /* --- STABLE V54 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -175,7 +175,7 @@
                     <span style="color:white; font-size:0.9rem;">Enable AI Parser <span class="ai-badge">SMART</span></span>
                 </label>
                 <div style="font-size:0.7rem; color:#94a3b8; margin-top:5px; margin-left:24px;">
-                    Sends file text to OpenAI for perfect extraction. Slower but accurate.
+                    Uses OpenAI to read messy files. Slower but more accurate.
                 </div>
             </div>
 
@@ -292,7 +292,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v53.0 (AI Parser Added)</div>
+        <div class="version-tag">v54.0 (AI Status Bar)</div>
     </div>
 </div>
 
@@ -332,6 +332,7 @@
     let isSettingsOpen = false; let isScriptOpen = false;
     let currentAudioObject = null;
     let viewMode = 'heats'; 
+    let progressInterval;
 
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
@@ -345,6 +346,42 @@
     function toggleAiParser() {
         const useAi = document.getElementById('useAiParser').checked;
         document.getElementById('manualFormatDiv').style.display = useAi ? 'none' : 'block';
+    }
+
+    // --- PROGRESS BAR LOGIC ---
+    function startFakeProgress() {
+        const bar = document.getElementById('progressFill');
+        const container = document.getElementById('progressBar');
+        container.style.display = 'block';
+        bar.style.width = '0%';
+        bar.style.backgroundColor = 'var(--green)';
+        let width = 0;
+        clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+            if(width >= 90) {
+                clearInterval(progressInterval); 
+            } else {
+                width += 5; // Fast initially
+                if(width > 50) width += 1; // Slow down
+                bar.style.width = width + '%';
+            }
+        }, 500);
+    }
+
+    function stopFakeProgress(success) {
+        clearInterval(progressInterval);
+        const bar = document.getElementById('progressFill');
+        if(success) {
+            bar.style.width = '100%';
+            setTimeout(() => { document.getElementById('progressBar').style.display = 'none'; }, 500);
+        } else {
+            bar.style.backgroundColor = '#ef4444'; // Red for error
+            setTimeout(() => { 
+                document.getElementById('progressBar').style.display = 'none'; 
+                bar.style.width = '0%'; 
+                bar.style.backgroundColor = 'var(--green)';
+            }, 2000);
+        }
     }
 
     window.onload = () => {
@@ -592,6 +629,13 @@
                 if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
                 fullText += lines.join("\n") + "\n";
             }
+            
+            if(!fullText.trim()) {
+                alert("This PDF has no text! It might be a scanned image. Please convert to JPG and upload as an Image.");
+                setStatus("PDF Error: No text found.", "error");
+                return;
+            }
+
             document.getElementById('dataInput').value = fullText;
             
             // Check AI Mode
@@ -606,7 +650,8 @@
         const key = cleanInput(document.getElementById('apiKey').value);
         if(!key.startsWith('sk-')) { alert("AI Parser requires a valid OpenAI API Key."); return; }
         
-        setStatus("Sending to AI (This takes ~10s)...", "working");
+        startFakeProgress();
+        setStatus("🤖 Sending to AI (This takes ~10-20s)...", "working");
         
         const systemPrompt = `You are a data extractor for swimming heat sheets. 
         Extract data into this JSON format:
@@ -646,12 +691,10 @@
             if(json.error) throw new Error(json.error.message);
             
             let content = json.choices[0].message.content;
-            // Strip markdown code blocks if AI adds them
             content = content.replace(/```json/g, "").replace(/```/g, "");
             
             const parsedData = JSON.parse(content);
             
-            // Convert AI format to internal format
             heats = {}; heatOrder = [];
             parsedData.forEach(h => {
                 if(!heats[h.heatId]) { heats[h.heatId] = { title: h.heatTitle, swimmers: [] }; heatOrder.push(h.heatId); }
@@ -669,11 +712,13 @@
             });
             
             saveSession();
+            stopFakeProgress(true);
             setStatus(`AI Found ${heatOrder.length} Heats.`, "ready");
             switchView('heats');
 
         } catch(e) {
             console.error(e);
+            stopFakeProgress(false);
             alert("AI Parse Failed: " + e.message + "\n\nFalling back to manual parser.");
             manualParse(true);
         }
