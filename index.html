@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v44 (Stop Button + 4 Scripts)</title>
+    <title>Swim Announcer Ultimate v49 (Photo & Format Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V44 LAYOUT --- */
+        /* --- STABLE V49 LAYOUT (Based on v44) --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -265,7 +265,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v44.0 (Stop + 4 Scripts)</div>
+        <div class="version-tag">v49.0 (Photo Fixed)</div>
     </div>
 </div>
 
@@ -485,29 +485,60 @@
         return text;
     }
 
-    // --- FILE HANDLING ---
+    // --- FILE HANDLING (ENHANCED FOR PHOTOS) ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
+        
+        // HEIC Check
+        if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+            alert("⚠️ iPhone HEIC photos are not supported by browsers.\n\nPlease take a Screenshot of the photo or convert to JPG.");
+            input.value = ''; // Reset
+            return;
+        }
+
         setStatus("Processing File...", "working");
         const type = file.type.toLowerCase();
         
         if (type === "application/pdf") handlePdf(file);
         else if (type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
+        else alert("Please upload PDF, JPG, or PNG.");
     }
 
     async function handleImage(file) {
-        setStatus("Scanning Image (OCR)...", "working");
+        setStatus("Initializing OCR Engine...", "working");
         try {
-            const worker = await Tesseract.createWorker('eng');
+            // Enhanced Tesseract config with progress
+            const worker = await Tesseract.createWorker('eng', 1, {
+                logger: m => {
+                    if(m.status === 'recognizing text') {
+                        const pct = Math.round(m.progress * 100);
+                        setStatus(`Scanning Photo... ${pct}%`, "working");
+                        document.getElementById('progressBar').style.display = 'block';
+                        document.getElementById('progressFill').style.width = `${pct}%`;
+                    }
+                }
+            });
+            
             const ret = await worker.recognize(file);
             await worker.terminate();
+            
+            // Clean up UI
+            document.getElementById('progressBar').style.display = 'none';
             document.getElementById('dataInput').value = ret.data.text;
+            
             const count = manualParse(true);
-            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed."); }
-            else setStatus(`Found ${count} swimmers.`, "ready");
-        } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
+            if(count === 0) { 
+                setStatus("OCR finished but found no swimmers. Check image quality/rotation.", "error"); 
+                alert("OCR finished, but no swimmers found.\n\nTips:\n1. Ensure image is NOT rotated.\n2. Crop to just the names/times.\n3. Make sure text is sharp."); 
+            } else {
+                setStatus(`Found ${count} swimmers from Image.`, "ready");
+            }
+        } catch(e) { 
+            console.error(e); 
+            setStatus("OCR Error: " + e.message, "error"); 
+            alert("Photo Error: " + e.message);
+        }
     }
 
     async function handlePdf(file) {
@@ -577,10 +608,17 @@
                 if(hMatch) currentHeat = hMatch[1];
                 if(line.includes("Alternates")) currentHeat = null;
 
-                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                // RELAXED REGEX: Handles "XNT", bad spacing (11PAC-IL), and misread chars
+                // Group 1: Lane (1-2 digits)
+                // Group 2: Name
+                // Group 3: Age
+                // Group 4: Team
+                // Group 5: Time (NT, XNT, numbers)
+                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s*([A-Za-z0-9\s\.-]+?)\s+(XNT|NT|nt|[\d:.]+)($|\s)/i);
                 let mode = "heat";
                 if(!m) {
-                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
+                    // Try Result Mode
+                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s*([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
                     mode = "result";
                 }
 
