@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer v44.1 (Results & Heats)</title>
+    <title>Swim Announcer v44.2 (Outro + Time)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -79,6 +79,10 @@
         .heat-header.active { background: #eff6ff; color: var(--accent); border-bottom-color: #bfdbfe; border-left: 5px solid var(--accent); }
         .heat-title { font-weight: 800; font-size: 1.1rem; color: #475569; }
         .heat-badge { font-size: 0.75rem; background: #e2e8f0; padding: 2px 8px; border-radius: 10px; color: #64748b; }
+        
+        .heat-footer { background: #f8fafc; padding: 8px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .heat-footer:hover { background: #e2e8f0; color: var(--accent); }
+        .heat-footer.active { background: var(--primary); color: white; }
 
         .swimmer-row { display: flex; align-items: center; padding: 10px 20px; border-bottom: 1px solid #f1f5f9; transition: 0.1s; background: white; }
         .swimmer-row:last-child { border-bottom: none; }
@@ -264,7 +268,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v44.1 (Results Fix)</div>
+        <div class="version-tag">v44.2 (Outro)</div>
     </div>
 </div>
 
@@ -277,22 +281,29 @@
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
             <button class="tab-btn" id="modalTab4" onclick="switchTab(4)">4. Awards</button>
         </div>
+        
         <label>EVENT INTRO SCRIPT</label>
-        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
+        <textarea id="introScriptInput" style="height:40px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:10px;" oninput="syncScript()"></textarea>
+        
         <label>SWIMMER SCRIPT</label>
-        <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
+        <textarea id="modalTemplateInput" style="height:100px; font-size:1.1rem; line-height:1.5; padding:15px; margin-bottom:10px;" oninput="syncScript()"></textarea>
+
+        <label>EVENT OUTRO SCRIPT</label>
+        <textarea id="outroScriptInput" style="height:40px; font-size:1rem; line-height:1.4; padding:10px;" oninput="syncScript()"></textarea>
+        
         <div style="margin-top:10px;">
             <label>Click to Insert Variable:</label>
             <div class="var-chips">
                 <div class="var-chip" onclick="insertVar('{event_title}')">{event_title}</div>
                 <div class="var-chip" onclick="insertVar('{event}')">{event}</div>
-                <div class="var-chip" onclick="insertVar('{event_name}')">{event_name}</div>
                 <div class="var-chip" onclick="insertVar('{heat}')">{heat}</div>
                 <div class="var-chip" onclick="insertVar('{lane}')">{lane}</div>
                 <div class="var-chip" onclick="insertVar('{place}')">{place}</div>
                 <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
                 <div class="var-chip" onclick="insertVar('{name}')">{name}</div>
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
+                <div class="var-chip" style="color:var(--orange); border-color:var(--orange);" onclick="insertVar('{current_time}')">{current_time}</div>
+                <div class="var-chip" style="color:var(--orange); border-color:var(--orange);" onclick="insertVar('{scratch_deadline}')">{scratch_deadline}</div>
             </div>
         </div>
         <button class="btn-gen" onclick="toggleScriptEditor()" style="margin-top:20px;">DONE</button>
@@ -302,21 +313,19 @@
 <script>
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
-    let currentAudioObject = null; // Track playing audio for Stop feature
+    let currentAudioObject = null;
 
     // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
 
-    // --- CLEAN KEY INPUT ---
     function cleanInput(str) {
         if (!str) return "";
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     }
 
     window.onload = () => {
-        // Init Keys
         if(localStorage.getItem('openai_key')) {
             document.getElementById('apiKey').value = localStorage.getItem('openai_key');
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
@@ -327,18 +336,15 @@
         }
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
-        // Init Engine
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
         document.getElementById('engineSelect').value = savedEngine;
         updateVoiceOptions();
 
-        // Init Dict
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
-        // Load Session
         if(localStorage.getItem('saved_heats')) loadSession();
         else loadTemplateUI();
         
@@ -346,7 +352,6 @@
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
-    // --- VOICE OPTIONS ---
     const VOICES_OPENAI = [
         {id:'nova', name:'Nova (Energetic)'}, 
         {id:'onyx', name:'Onyx (Announcer)'}, 
@@ -366,8 +371,6 @@
         const select = document.getElementById('voiceSelect');
         const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
-        
-        // Show Custom Voice Field if ElevenLabs
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
 
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
@@ -387,7 +390,6 @@
         localStorage.setItem('engine_pref', engine);
     }
 
-    // --- SESSION ---
     function saveSession() {
         localStorage.setItem('saved_heats', JSON.stringify(heats));
         localStorage.setItem('saved_order', JSON.stringify(heatOrder));
@@ -430,7 +432,6 @@
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
-    // --- TEMPLATES (ADDED 4TH OPTION) ---
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
@@ -443,6 +444,12 @@
         3: "And now, the results for {event_title}.",
         4: "Ladies and gentlemen, please welcome our award winners for {event_title}."
     };
+    const defaultOutros = {
+        1: "", 2: "", 
+        3: "The time is now {current_time}. Scratches are due by {scratch_deadline}.",
+        4: ""
+    };
+
     let currentTab = 1;
 
     function switchTab(t) { 
@@ -455,9 +462,12 @@
     function loadTemplateUI() { 
         const bodyVal = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
         const introVal = localStorage.getItem('intro_'+currentTab) || defaultIntros[currentTab];
+        const outroVal = localStorage.getItem('outro_'+currentTab) || defaultOutros[currentTab];
+        
         document.getElementById('templatePreview').value = bodyVal;
         document.getElementById('modalTemplateInput').value = bodyVal;
         document.getElementById('introScriptInput').value = introVal;
+        document.getElementById('outroScriptInput').value = outroVal;
     }
     
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
@@ -484,7 +494,6 @@
         return text;
     }
 
-    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
@@ -537,13 +546,11 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER ---
     function manualParse(silent = false) {
         try {
             let raw = document.getElementById('dataInput').value;
-            // PRE-CLEAN COMMON OCR ERRORS
             raw = raw.replace(/Club-I1/g, "Club-IL").replace(/Club-1l/g, "Club-IL");
-            raw = raw.replace(/(\d{1}):(\d{4})/g, "$1:$2"); // Fix 2:2046 -> 2:20.46 kind of, mostly handles later
+            raw = raw.replace(/(\d{1}):(\d{4})/g, "$1:$2");
 
             const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
@@ -559,7 +566,6 @@
                     currentEvent = evtMatch[1];
                     let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
                     if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
-                    // Reset Heat to 1 for Results mode
                     currentHeat = "1"; 
                 } 
                 else {
@@ -573,14 +579,8 @@
                 const hMatch = line.match(/Heat\s+(\d+)/i);
                 if(hMatch) currentHeat = hMatch[1];
 
-                // --- TRY STANDARD HEAT SHEET REGEX (Lane - Name - Age - Team - Time) ---
                 let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-                
-                // --- TRY RESULTS REGEX (Place - Name - Age - Team - Time1 - Time2) ---
-                // Looks for: 1 Keller, Amelia 12 Patriot Aquatic Club-IL 2:21.48 2:07.31 aq
-                if (!m) {
-                     m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+(?:NT|[\d:\.]+)\s+([\d:\.]+).*/i);
-                }
+                if (!m) m = line.match(/^(\d+)\s+([A-Za-z,\.\-\s]+?)\s+(\d{1,2})\s+(.+?)\s+(?:NT|[\d:\.]+)\s+([\d:\.]+).*/i);
 
                 if(m && currentEvent) {
                     let rawName = m[2].trim();
@@ -600,9 +600,7 @@
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
                     const displayTitle = `Event ${currentEvent} - ${currentEventName}`;
                     
-                    // CLEANUP TIME (OCR Fixes)
                     let timeVal = m[5].toUpperCase();
-                    // Fix "2:2046" -> "2:20.46"
                     if(timeVal.match(/^\d:\d{4}$/)) {
                         timeVal = timeVal.slice(0, 4) + "." + timeVal.slice(4);
                     }
@@ -627,7 +625,6 @@
                 saveSession();
                 renderBoard();
                 
-                // Auto-switch to Results Template if it looks like results
                 if(parsedData.length > 8 && currentTab !== 3) {
                    if(confirm("This looks like Results data. Switch to Results script mode?")) {
                        switchTab(3);
@@ -681,6 +678,14 @@
             addBtn.onclick = () => addSwimmer(heatKey);
             heatBlock.appendChild(addBtn);
 
+            // Outro Footer
+            const footer = document.createElement('div');
+            footer.className = 'heat-footer';
+            if(currentSelection.heat === heatKey && currentSelection.index === -2) footer.classList.add('active');
+            footer.innerHTML = "📢 Outro";
+            footer.onclick = () => selectCue(heatKey, -2);
+            heatBlock.appendChild(footer);
+
             container.appendChild(heatBlock);
         });
     }
@@ -720,15 +725,20 @@
     function syncScript() {
         const bodyVal = document.getElementById('modalTemplateInput').value;
         const introVal = document.getElementById('introScriptInput').value;
+        const outroVal = document.getElementById('outroScriptInput').value;
+        
         document.getElementById('templatePreview').value = bodyVal;
         localStorage.setItem('t_'+currentTab, bodyVal);
         localStorage.setItem('intro_'+currentTab, introVal);
+        localStorage.setItem('outro_'+currentTab, outroVal);
         markDirty();
     }
 
     function insertVar(text) {
         let el = document.activeElement;
-        if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
+        // Default to swimmer script if focus is lost or elsewhere
+        if(['modalTemplateInput','introScriptInput','outroScriptInput'].indexOf(el.id) === -1) el = document.getElementById('modalTemplateInput');
+        
         const start = el.selectionStart; const end = el.selectionEnd; const val = el.value;
         el.value = val.substring(0, start) + text + val.substring(end);
         el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
@@ -738,13 +748,17 @@
         let s = ["th", "st", "nd", "rd"]; let v = n % 100;
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
     }
+    
+    function getClockTime(addMinutes = 0) {
+        const d = new Date();
+        d.setMinutes(d.getMinutes() + addMinutes);
+        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
 
     async function generateAudio() {
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
-        
-        // Custom Voice ID Logic
         const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
         let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
 
@@ -753,23 +767,33 @@
 
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+        
         const template = document.getElementById('modalTemplateInput').value; 
         const introTemplate = document.getElementById('introScriptInput').value;
+        const outroTemplate = document.getElementById('outroScriptInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
         const queue = [];
         
+        // Calculate Times
+        const nowStr = getClockTime(0);
+        const dueStr = getClockTime(30);
+
         for (const heatKey of heatOrder) {
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
+            const oId = `o_${heatKey}`; // Outro ID
             
+            // INTRO
             if (forceRegen || !audioCache[hId]) {
                 let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
                 introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
                 introText = applyHype(introText);
-                queue.push({ id: hId, text: introText });
+                if(introText.trim()) queue.push({ id: hId, text: introText });
             }
+            
+            // SWIMMERS
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
@@ -781,12 +805,23 @@
                     queue.push({ id: s.id, text: txt });
                 }
             }
+
+            // OUTRO
+            if (forceRegen || !audioCache[oId]) {
+                if(outroTemplate.trim()) {
+                    let outroText = outroTemplate.replace(/{current_time}/g, nowStr).replace(/{scratch_deadline}/g, dueStr);
+                    // Standard vars also avail in outro
+                    outroText = outroText.replace(/{event_title}/g, `Event ${group.swimmers[0].event}`).replace(/{event}/g, group.swimmers[0].event);
+                    outroText = applyHype(outroText);
+                    queue.push({ id: oId, text: outroText });
+                }
+            }
         }
 
         const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
         
         let completed = 0; const total = queue.length;
-        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
+        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); renderBoard(); return; }
         setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
 
         async function worker() {
@@ -855,15 +890,31 @@
         stopPlayback(); // Auto-stop previous
         const { heat, index } = currentSelection;
         let aud = null; let msg = "";
-        if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
-        else { const s = heats[heat].swimmers[index]; if(!s.scratched) { aud = audioCache[s.id]; msg = `Announcing Lane ${s.lane}...`; } else { msg = "Skipping Scratched..."; } }
+        
+        if(index === -1) { 
+            aud = audioCache[`h_${heat}`]; 
+            msg = `Announcing ${heats[heat].title}...`; 
+        }
+        else if(index === -2) { 
+            aud = audioCache[`o_${heat}`]; 
+            msg = `Announcing Outro...`; 
+        }
+        else { 
+            const s = heats[heat].swimmers[index]; 
+            if(!s.scratched) { aud = audioCache[s.id]; msg = `Announcing Lane ${s.lane}...`; } 
+            else { msg = "Skipping Scratched..."; } 
+        }
         
         if(aud) { 
             currentAudioObject = aud;
             aud.currentTime=0; 
             aud.play(); 
             setStatus(msg, "working"); 
-        } else setStatus("No Audio Generated.", "working");
+        } else if (msg.includes("Skipping")) {
+            // pass
+        } else {
+            setStatus("No Audio Generated.", "working");
+        }
     }
 
     document.addEventListener('keydown', (e) => {
@@ -876,10 +927,21 @@
 
     function navigate(dir) {
         let flatMap = [];
-        heatOrder.forEach(h => { flatMap.push({ heat: h, index: -1 }); heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); }); });
+        heatOrder.forEach(h => { 
+            flatMap.push({ heat: h, index: -1 }); // Intro
+            heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
+            flatMap.push({ heat: h, index: -2 }); // Outro
+        });
+        
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
         if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
-        if(currIdx >= 0 && currIdx < flatMap.length) { currentSelection = flatMap[currIdx]; renderBoard(); const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); }
+        
+        if(currIdx >= 0 && currIdx < flatMap.length) { 
+            currentSelection = flatMap[currIdx]; 
+            renderBoard(); 
+            const el = document.querySelector('.active'); 
+            if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); 
+        }
     }
 </script>
 </body>
