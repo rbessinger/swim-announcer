@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v45 (Roster Search)</title>
+    <title>Swim Announcer Ultimate v46 (Crash Proof)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V45 LAYOUT --- */
+        /* --- STABLE V46 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -279,7 +279,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v45.0 (Roster Mode)</div>
+        <div class="version-tag">v46.0 (Safe Mode)</div>
     </div>
 </div>
 
@@ -817,75 +817,99 @@
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
-        
-        // Custom Voice ID Logic
-        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
-        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
-
-        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
-        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
-
         const btn = document.getElementById('btnGenerate');
-        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
-        const template = document.getElementById('modalTemplateInput').value; 
-        const introTemplate = document.getElementById('introScriptInput').value;
-        const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-        const voice = document.getElementById('voiceSelect').value;
-        const forceRegen = document.getElementById('forceRegen').checked;
-        const queue = [];
         
-        for (const heatKey of heatOrder) {
-            const group = heats[heatKey];
-            const hId = `h_${heatKey}`;
+        try {
+            const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+            let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
+
+            if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+            if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+
+            // Safe Dictionary Parse
+            let dict = {};
+            try {
+                dict = JSON.parse(document.getElementById('dictInput').value || "{}");
+            } catch(e) {
+                alert("Dictionary Error: Invalid JSON. Please fix syntax.");
+                return; 
+            }
+
+            btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+            const template = document.getElementById('modalTemplateInput').value; 
+            const introTemplate = document.getElementById('introScriptInput').value;
+            const voice = document.getElementById('voiceSelect').value;
+            const forceRegen = document.getElementById('forceRegen').checked;
+            const queue = [];
             
-            if (forceRegen || !audioCache[hId]) {
-                let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
-                introText = applyHype(introText);
-                queue.push({ id: hId, text: introText });
-            }
-            for (const s of group.swimmers) {
-                if(s.scratched) continue;
-                if (forceRegen || !audioCache[s.id]) {
-                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-                    let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
-                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                    txt = applyHype(txt);
-                    queue.push({ id: s.id, text: txt });
+            for (const heatKey of heatOrder) {
+                const group = heats[heatKey];
+                // Safety: Skip empty groups
+                if (!group.swimmers || group.swimmers.length === 0) continue;
+
+                const hId = `h_${heatKey}`;
+                
+                if (forceRegen || !audioCache[hId]) {
+                    let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+                    introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                    introText = applyHype(introText);
+                    queue.push({ id: hId, text: introText });
+                }
+                for (const s of group.swimmers) {
+                    if(s.scratched) continue;
+                    if (forceRegen || !audioCache[s.id]) {
+                        let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                        let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+                        let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+                        for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+                        txt = applyHype(txt);
+                        queue.push({ id: s.id, text: txt });
+                    }
                 }
             }
-        }
 
-        const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
-        
-        let completed = 0; const total = queue.length;
-        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
-        setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
-
-        async function worker() {
-            while (queue.length > 0) {
-                const task = queue.shift();
-                try {
-                    let res = null;
-                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                    else res = await fetchOpenAI(task.text, voice, oaKey);
-                    
-                    if(res) audioCache[task.id] = res;
-                } catch(e) { 
-                    console.error(e); 
-                    alert(`API Error: ${e.message}`);
-                }
-                completed++;
-                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+            const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+            
+            let completed = 0; const total = queue.length;
+            if (total === 0) { 
+                setStatus("Nothing new to generate.", "ready"); 
+                return; 
             }
+            
+            setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
+
+            async function worker() {
+                while (queue.length > 0) {
+                    const task = queue.shift();
+                    try {
+                        let res = null;
+                        if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                        else res = await fetchOpenAI(task.text, voice, oaKey);
+                        
+                        if(res) audioCache[task.id] = res;
+                    } catch(e) { 
+                        console.error(e); 
+                        alert(`API Error: ${e.message}`);
+                    }
+                    completed++;
+                    document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+                }
+            }
+            const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+            await Promise.all(workers);
+            
+            setStatus("Audio Ready.", "ready");
+            if(viewMode === 'heats') renderBoard();
+            else renderRoster();
+
+        } catch (err) {
+            console.error(err);
+            alert("Crash Prevented: " + err.message);
+        } finally {
+            // ALWAYS reset button
+            btn.disabled = false; 
+            btn.innerText = "⚡ GENERATE AUDIO"; 
         }
-        const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
-        await Promise.all(workers);
-        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready");
-        // Re-render current view to show new Play icons
-        if(viewMode === 'heats') renderBoard();
-        else renderRoster();
     }
 
     async function fetchOpenAI(text, voice, key) {
@@ -922,14 +946,14 @@
     }
 
     function triggerGo() {
-        if(viewMode !== 'heats') return; // Only spacebar in Heat mode
+        if(viewMode !== 'heats') return; 
         const { heat, index } = currentSelection;
         if(heat === null) { if(heatOrder.length > 0) selectCue(heatOrder[0], -1); else return; }
         playSelection(); navigate(1);
     }
 
     function playSelection() {
-        stopPlayback(); // Auto-stop previous
+        stopPlayback(); 
         const { heat, index } = currentSelection;
         let aud = null; let msg = "";
         if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
@@ -952,7 +976,7 @@
     });
 
     function navigate(dir) {
-        if(viewMode !== 'heats') return; // Only arrow nav in Heat mode
+        if(viewMode !== 'heats') return; 
         let flatMap = [];
         heatOrder.forEach(h => { flatMap.push({ heat: h, index: -1 }); heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); }); });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
