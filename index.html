@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v22 (Persistent)</title>
+    <title>Swim Announcer Ultimate v23 (Triple Intros)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
@@ -151,8 +152,8 @@
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">Drag PDF or Image here</div>
-                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
+                    <div class="file-upload-text">Drag PDF or Image (HEIC/JPG)</div>
+                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg,.heic" onchange="handleFileUpload(this)">
                 </label>
             </div>
 
@@ -314,7 +315,8 @@
         modal.classList.toggle('active', isScriptOpen);
         
         if(isScriptOpen) {
-            document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value;
+            // Refresh from current state when opening
+            loadTemplateUI();
             document.getElementById('goBtnContainer').classList.add('disabled');
         } else {
             document.getElementById('goBtnContainer').classList.remove('disabled');
@@ -327,7 +329,7 @@
         
         document.getElementById('templatePreview').value = bodyVal;
         
-        // Save both fields
+        // Save both fields to specific tab index
         localStorage.setItem('t_'+currentTab, bodyVal);
         localStorage.setItem('intro_'+currentTab, introVal);
         
@@ -335,7 +337,6 @@
     }
 
     function insertVar(text) {
-        // Decide which box has focus (or default to main script)
         let el = document.activeElement;
         if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
         
@@ -350,15 +351,17 @@
 
     function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
     
+    // --- 3 PROFILES FOR BODY & INTRO ---
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.",
         3: "In {place} place, with a time of {time}, from {team}, {name}."
     };
+    
     const defaultIntros = {
         1: "Now swimming {event_title}.",
-        2: "Ladies and gentlemen, welcome to the finals for {event_title}.",
-        3: "Here are the results for {event_title}."
+        2: "Ladies and gentlemen, please welcome the finalists for {event_title}.",
+        3: "And now, the results for {event_title}."
     };
 
     let currentTab = 1;
@@ -373,6 +376,7 @@
     }
     
     function loadTemplateUI() { 
+        // Load Body and Intro for current tab
         const bodyVal = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
         const introVal = localStorage.getItem('intro_'+currentTab) || defaultIntros[currentTab];
         
@@ -405,13 +409,34 @@
         return text;
     }
 
+    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
         setStatus("Processing File...", "working");
-        if (file.type === "application/pdf") handlePdf(file);
-        else if (file.type.startsWith("image/")) handleImage(file);
-        else alert("Please upload a PDF or Image (JPG/PNG).");
+        
+        const type = file.type.toLowerCase();
+        
+        if (type === "application/pdf") {
+            handlePdf(file);
+        } else if (type.includes("heic")) {
+            handleHeic(file);
+        } else if (type.startsWith("image/")) {
+            handleImage(file);
+        } else {
+            alert("Please upload PDF, JPG, PNG, or HEIC.");
+        }
+    }
+
+    async function handleHeic(file) {
+        setStatus("Converting HEIC...", "working");
+        try {
+            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
+            handleImage(blob);
+        } catch(e) {
+            console.error(e);
+            setStatus("HEIC Conversion Failed.", "error");
+        }
     }
 
     async function handleImage(file) {
@@ -467,6 +492,7 @@
         for(let i=0; i<lines.length; i++) {
             let line = lines[i].trim();
             
+            // Event Universal
             const evtMatch = line.match(/^Event\s+(\d+)\s+(.*)/i);
             if(evtMatch) {
                 currentEvent = evtMatch[1];
@@ -645,16 +671,13 @@
             const hId = `h_${heatKey}`;
             
             if (forceRegen || !audioCache[hId]) {
-                // Use the custom Intro Template
                 let introText = introTemplate;
-                // Build Title (Event + Name)
                 let eventTitle = `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}`;
                 if (group.swimmers[0].heat) eventTitle += `, Heat ${group.swimmers[0].heat}`;
-                else eventTitle += ", Results"; // Fallback for results mode
+                else eventTitle += ", Results";
 
                 introText = introText.replace(/{event_title}/g, eventTitle);
                 
-                // Also support individual variables in intro if user wants
                 introText = introText
                     .replace(/{event}/g, group.swimmers[0].event)
                     .replace(/{event_name}/g, group.swimmers[0].eventName)
@@ -667,7 +690,6 @@
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
-                    // Build Event Title variable for swimmer scripts
                     let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
 
                     let txt = template
