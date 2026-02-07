@@ -2,17 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v3</title>
+    <title>Swim Announcer Ultimate v4 (Pro)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
     <style>
-        :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f1f5f9; --text: #334155; --surface: #ffffff; --green: #10b981; }
+        :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f1f5f9; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* --- SIDEBAR --- */
+        /* SIDEBAR */
         .sidebar { width: 350px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 20px; background: #020617; border-bottom: 1px solid #1e293b; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
@@ -21,56 +19,64 @@
         label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; display: block; margin-bottom: 6px; color: #64748b; }
         input, textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
         input:focus, textarea:focus { border-color: var(--accent); outline: none; }
-        textarea { height: 120px; resize: none; line-height: 1.4; }
+        textarea { height: 100px; resize: none; line-height: 1.4; }
 
-        /* File Upload Styling */
         .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; }
-        .file-upload-box:hover { border-color: var(--accent); background: #1e293b; }
+        .file-upload-box:hover { border-color: var(--accent); }
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
         input[type="file"] { display: none; }
 
-        /* Template Controls */
+        /* TABS */
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
         .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
         .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
-
         .variables { font-size: 0.75rem; color: #64748b; margin-top: 5px; background: #0f172a; padding: 8px; border-radius: 4px; border: 1px dashed #334155; }
         .var-tag { color: var(--accent); font-weight: bold; }
 
-        /* Action Area */
+        /* ACTION AREA */
         .action-area { padding: 20px; background: #020617; border-top: 1px solid #1e293b; }
         .btn-gen { width: 100%; background: var(--accent); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-gen:hover { background: #2563eb; }
         .btn-gen:disabled { background: #334155; cursor: not-allowed; opacity: 0.7; }
-        
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
-        /* --- MAIN DASHBOARD --- */
+        /* MAIN DASHBOARD */
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; }
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .status { font-weight: bold; font-size: 0.9rem; color: #64748b; }
         .status.ready { color: var(--green); }
+        .status.working { color: var(--accent); }
 
-        /* Swimmer List */
+        /* LIST & CARDS */
         .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; }
         
         .heat-header { margin: 30px 0 15px 0; padding: 15px; background: #e2e8f0; border-radius: 8px; font-weight: 800; color: #475569; font-size: 1.1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 2px solid transparent; }
         .heat-header:first-child { margin-top: 0; }
         .heat-header.active { border-color: var(--accent); background: #dbeafe; color: var(--accent); }
 
-        .swimmer-card { display: flex; align-items: center; background: var(--surface); margin-bottom: 10px; padding: 15px 20px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; transition: 0.1s; position: relative; }
+        .swimmer-card { display: flex; align-items: center; background: var(--surface); margin-bottom: 10px; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; transition: 0.1s; position: relative; }
         .swimmer-card:hover { transform: translateX(5px); border-color: #cbd5e1; }
         .swimmer-card.active { border-left: 6px solid var(--accent); background: #eff6ff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         
-        .lane-box { width: 50px; font-size: 1.5rem; font-weight: 800; color: #cbd5e1; text-align: center; margin-right: 20px; }
+        /* Scratch State */
+        .swimmer-card.scratched { opacity: 0.5; background: #f1f5f9; border-color: #e2e8f0; }
+        .swimmer-card.scratched .name-text { text-decoration: line-through; color: #94a3b8; }
+
+        .lane-box { width: 40px; font-size: 1.4rem; font-weight: 800; color: #cbd5e1; text-align: center; margin-right: 15px; }
         .active .lane-box { color: var(--accent); }
+        
         .info-box { flex: 1; }
         .name-text { font-size: 1.1rem; font-weight: 700; color: var(--text); }
-        .team-text { font-size: 0.9rem; color: #64748b; }
-        .time-text { font-size: 0.9rem; font-family: monospace; color: #94a3b8; background: #f1f5f9; padding: 4px 8px; border-radius: 4px; }
+        .team-text { font-size: 0.85rem; color: #64748b; }
+        .time-text { font-size: 0.85rem; font-family: monospace; color: #94a3b8; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; margin-right: 10px;}
 
-        .audio-indicator { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; margin-left: 15px; }
+        /* Buttons on Card */
+        .scratch-btn { padding: 5px 10px; border-radius: 4px; border: 1px solid #cbd5e1; background: white; color: #94a3b8; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition:0.2s; margin-right: 10px; }
+        .scratch-btn:hover { background: #fee2e2; color: var(--red); border-color: var(--red); }
+        .scratch-btn.is-scratched { background: var(--red); color: white; border-color: var(--red); }
+
+        .audio-indicator { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
         .has-audio .audio-indicator { background: var(--green); box-shadow: 0 0 5px var(--green); }
         
     </style>
@@ -79,17 +85,12 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate Announcer v3</h2>
+        <h2>🏊 Ultimate Announcer v4</h2>
     </div>
     
     <div class="scroll-area">
         <div>
-            <label>OpenAI API Key</label>
-            <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
-        </div>
-
-        <div>
-            <label>Upload Meet Program (PDF)</label>
+            <label>1. Upload Meet Program (PDF)</label>
             <label class="file-upload-box">
                 <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
                 <div class="file-upload-text">Click to upload PDF</div>
@@ -98,7 +99,7 @@
         </div>
 
         <div>
-            <label>Script Template</label>
+            <label>2. Script Template</label>
             <div class="template-tabs">
                 <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
                 <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
@@ -109,9 +110,24 @@
             </div>
         </div>
 
+        <div>
+            <label>3. Phonetic Dictionary (JSON)</label>
+            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">Edit code to perm-save. Format: "Name": "Sound"</div>
+            <textarea id="dictInput" style="height:80px; font-family:monospace; font-size:0.75rem;">
+{
+  "Nguyen": "Win",
+  "Gavrilos": "Gah-vree-los",
+  "Qiu": "Chew",
+  "Bota": "Boat-ah",
+  "Sverdlik": "Sverd-lick",
+  "Ledecky": "Le-deck-ee"
+}
+            </textarea>
+        </div>
+
         <div style="opacity: 0.5;">
-            <label>Raw Data (Auto-Filled)</label>
-            <textarea id="dataInput" placeholder="Manually paste here if PDF fails..." style="height: 60px; font-size: 0.75rem;"></textarea>
+            <label>Raw Data</label>
+            <textarea id="dataInput" placeholder="Manually paste here if PDF fails..." style="height: 50px; font-size: 0.75rem;"></textarea>
         </div>
     </div>
 
@@ -137,39 +153,43 @@
     <div class="top-bar">
         <div>
             <span style="font-weight: bold;">Status:</span> 
-            <span id="statusText" class="status">Waiting for data...</span>
+            <span id="statusText" class="status">Waiting for PDF...</span>
         </div>
         <div style="font-size: 0.85rem; color: #64748b;">
-            <b>Space:</b> Play &nbsp;|&nbsp; <b>↓/↑:</b> Navigate
+            <b>Space:</b> Play &nbsp;|&nbsp; <b>↓/↑:</b> Navigate (Skips Scratches)
         </div>
     </div>
 
     <div class="list-container" id="listContainer">
         <div style="text-align:center; color:#94a3b8; margin-top:50px;">
-            Upload a PDF or paste data to begin.
+            Upload a PDF to see swimmers here.
         </div>
     </div>
 </div>
 
 <script>
+    // ==========================================
+    // ⚠️ CONFIGURATION: PASTE API KEY HERE ⚠️
+    // ==========================================
+    const HARDCODED_KEY = ""; // Example: "sk-proj-12345..."
+    
     // --- STATE ---
     let appData = [];
     let audioCache = {};
     let currentIndex = 0;
     
-    // --- CONFIG & STORAGE ---
     const defaultTemplates = {
         1: "In lane {lane}, representing {team}, {name}.",
         2: "Winner in lane {lane}, {name}, with a time of {time}."
     };
     let currentTab = 1;
 
+    // --- INITIALIZATION ---
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
         loadTemplateUI();
         
-        // Prevent Sleep
+        // Prevent Sleep (Keep Awake)
         document.addEventListener('click', async () => {
             if ('wakeLock' in navigator && !window.wakeLockObj) {
                 try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){}
@@ -178,7 +198,6 @@
     };
 
     function saveConfig() {
-        localStorage.setItem('openai_key', document.getElementById('apiKey').value);
         localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value);
     }
     function switchTab(tab) {
@@ -194,118 +213,118 @@
     function saveTemplate() {
         localStorage.setItem('template_' + currentTab, document.getElementById('templateInput').value);
     }
+    function setStatus(msg, type='normal') {
+        const el = document.getElementById('statusText');
+        el.innerText = msg;
+        el.className = 'status ' + type;
+    }
 
-    // --- PDF PARSING ENGINE ---
+    // --- PRONUNCIATION ENGINE ---
+    function fixPronunciation(text) {
+        try {
+            const rawJson = document.getElementById('dictInput').value;
+            const overrides = JSON.parse(rawJson);
+            let fixed = text;
+            for (const [original, phonetic] of Object.entries(overrides)) {
+                const regex = new RegExp(`\\b${original}\\b`, 'gi'); 
+                fixed = fixed.replace(regex, phonetic);
+            }
+            return fixed;
+        } catch(e) {
+            console.error("Dictionary Error", e);
+            return text; // Fail safe
+        }
+    }
+
+    // --- PDF PARSING ENGINE (FIXED) ---
     async function handlePdfUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
-        document.getElementById('statusText').innerText = "Reading PDF...";
         document.querySelector('.file-upload-text').innerText = file.name;
+        setStatus("Starting PDF Read...", "working");
 
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        
-        let fullText = "";
-        let parsedRows = []; // To store: {heat, lane, team, name, time}
-        
-        // Loop through all pages
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             
-            // PDF text is jumbled. Sort by Y (top to bottom), then X (left to right)
-            const items = textContent.items.map(item => ({
-                str: item.str,
-                x: item.transform[4],
-                y: item.transform[5] // Y origin is bottom-left usually
-            }));
+            let parsedRows = []; 
             
-            // Group items into "Lines" based on similar Y values (tolerance of 5px)
-            items.sort((a, b) => b.y - a.y); // Sort Top-Down
-            
-            let lines = [];
-            let currentLine = [];
-            let lastY = items[0]?.y || 0;
+            // Loop pages with UI updates
+            for (let i = 1; i <= pdf.numPages; i++) {
+                setStatus(`Reading PDF Page ${i} of ${pdf.numPages}...`, "working");
+                // Small pause to let UI render the status text
+                await new Promise(r => setTimeout(r, 10)); 
 
-            items.forEach(item => {
-                if (Math.abs(item.y - lastY) > 5) {
-                    // New Line detected
-                    // Sort previous line by X
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                
+                // Sort by Y (Top->Bottom)
+                const items = textContent.items.map(item => ({
+                    str: item.str, x: item.transform[4], y: item.transform[5] 
+                }));
+                items.sort((a, b) => b.y - a.y);
+                
+                // Line grouping
+                let lines = [];
+                let currentLine = [];
+                let lastY = items[0]?.y || 0;
+
+                items.forEach(item => {
+                    if (Math.abs(item.y - lastY) > 5) {
+                        currentLine.sort((a, b) => a.x - b.x);
+                        lines.push(currentLine.map(obj => obj.str).join(" "));
+                        currentLine = [];
+                        lastY = item.y;
+                    }
+                    currentLine.push(item);
+                });
+                if (currentLine.length > 0) {
                     currentLine.sort((a, b) => a.x - b.x);
                     lines.push(currentLine.map(obj => obj.str).join(" "));
-                    currentLine = [];
-                    lastY = item.y;
                 }
-                currentLine.push(item);
-            });
-            // Push last line
-            if (currentLine.length > 0) {
-                currentLine.sort((a, b) => a.x - b.x);
-                lines.push(currentLine.map(obj => obj.str).join(" "));
+
+                // Regex Logic
+                let currentHeat = null;
+                let ignoreSection = false;
+
+                lines.forEach(line => {
+                    line = line.trim();
+                    const heatMatch = line.match(/Heat\s+(\d+)\s+of/i);
+                    if (heatMatch) { currentHeat = heatMatch[1]; ignoreSection = false; return; }
+                    if (line.includes("Alternates")) { ignoreSection = true; return; }
+                    
+                    if (currentHeat && !ignoreSection) {
+                        // Stevenson/Patriot Format Regex
+                        const rowMatch = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
+                        if (rowMatch) {
+                            parsedRows.push({
+                                heat: currentHeat,
+                                name: rowMatch[1].trim(),
+                                lane: rowMatch[2],
+                                team: rowMatch[3].trim(),
+                                time: rowMatch[4]
+                            });
+                        }
+                    }
+                });
             }
 
-            // --- PARSE LINES ---
-            let currentHeat = null;
-            let ignoreSection = false;
+            // Output to raw data box
+            let tsvOutput = "";
+            parsedRows.forEach(r => { tsvOutput += `${r.heat}\t${r.lane}\t${r.team}\t${r.name}\t${r.time}\n`; });
+            document.getElementById('dataInput').value = tsvOutput;
+            
+            parseData(); 
+            setStatus(`Loaded ${parsedRows.length} swimmers. Ready to Generate.`, "ready");
 
-            lines.forEach(line => {
-                line = line.trim();
-                
-                // 1. Detect Header: "Heat 1 of 1 Semis"
-                const heatMatch = line.match(/Heat\s+(\d+)\s+of/i);
-                if (heatMatch) {
-                    currentHeat = heatMatch[1];
-                    ignoreSection = false;
-                    return;
-                }
-
-                // 2. Detect "Alternates" - Stop parsing this heat
-                if (line.includes("Alternates")) {
-                    ignoreSection = true;
-                    return;
-                }
-                
-                // 3. Detect Swimmer Row
-                // Pattern from file: Name (String) Lane (Digit) Age (Digit) Team (String) Time (Decimal)
-                // Example: "Shen, Esmae Z 3 13 Patriot Aquatic Club-IL 26.38"
-                // Regex Breakdown:
-                // ^(.+?)           -> Name (Group 1, Lazy match start)
-                // \s+(\d{1,2})     -> Lane (Group 2, 1-2 digits)
-                // \s+\d{1,2}       -> Age (Skip)
-                // \s+(.+)          -> Team (Group 3, Middle text)
-                // \s+(\d+\.\d{2})  -> Time (Group 4, Ends with decimal)
-                
-                if (currentHeat && !ignoreSection) {
-                    // Note: Regex handles the specific Stevenson HS layout
-                    const rowMatch = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
-                    
-                    if (rowMatch) {
-                        parsedRows.push({
-                            heat: currentHeat,
-                            name: rowMatch[1].trim(), // "Shen, Esmae Z"
-                            lane: rowMatch[2],        // "3"
-                            team: rowMatch[3].trim(), // "Patriot Aquatic Club-IL"
-                            time: rowMatch[4]         // "26.38"
-                        });
-                    }
-                }
-            });
+        } catch (e) {
+            console.error(e);
+            setStatus("Error reading PDF. See console.", "working"); // Error color reused
+            alert("Could not parse PDF. Please try pasting raw text.");
         }
-
-        // Convert parsed rows to the Textarea format for the existing engine
-        let tsvOutput = "";
-        parsedRows.forEach(r => {
-            tsvOutput += `${r.heat}\t${r.lane}\t${r.team}\t${r.name}\t${r.time}\n`;
-        });
-
-        document.getElementById('dataInput').value = tsvOutput;
-        parseData(); // Trigger UI update
-        document.getElementById('statusText').innerText = `Loaded ${parsedRows.length} swimmers.`;
-        document.getElementById('statusText').className = "status ready";
     }
 
-
-    // --- ORIGINAL CORE ENGINE ---
+    // --- CORE DATA HANDLING ---
     function parseData() {
         const raw = document.getElementById('dataInput').value;
         const rows = raw.split('\n');
@@ -315,30 +334,27 @@
         rows.forEach(row => {
             if(!row.trim()) return;
             const parts = row.split('\t');
+            if (parts.length < 5) return;
             
-            let heat, lane, team, name, time;
-            if (parts.length >= 5) {
-                heat = parts[0].trim();
-                lane = parts[1].trim();
-                team = parts[2].trim();
-                name = parts[3].trim();
-                time = parts[4].trim();
-            } else return;
-
+            const heat = parts[0].trim();
             if (heat !== currentHeat) {
                 appData.push({ type: 'header', heat: heat, id: 'h_'+heat });
                 currentHeat = heat;
             }
-
-            appData.push({ type: 'swimmer', heat, lane, team, name, time, id: `s_${heat}_${lane}` });
+            appData.push({ 
+                type: 'swimmer', 
+                heat, lane: parts[1], team: parts[2], name: parts[3], time: parts[4], 
+                id: `s_${heat}_${parts[1]}`,
+                scratched: false 
+            });
         });
-        
         renderList();
     }
 
+    // --- AUDIO GENERATION ---
     async function generateAudio() {
-        const key = document.getElementById('apiKey').value;
-        if(!key.startsWith('sk-')) { alert("Invalid API Key"); return; }
+        const key = HARDCODED_KEY;
+        if(!key || key === "") { alert("Please add your API Key in the code (Line 283)."); return; }
         
         parseData(); 
         if(appData.length === 0) return;
@@ -352,20 +368,27 @@
         btn.disabled = true;
         btn.innerText = "GENERATING...";
         audioCache = {}; 
+        setStatus("Generating AI Audio...", "working");
 
         for (let i = 0; i < appData.length; i++) {
             const item = appData[i];
-            let text = "";
+            
+            // Skip generation if scratched (save money)
+            if (item.scratched) continue;
 
+            let text = "";
             if (item.type === 'header') {
                 text = `Now swimming heat ${item.heat}.`;
             } else {
-                text = template
+                let rawText = template
                     .replace(/{heat}/g, item.heat)
                     .replace(/{lane}/g, item.lane)
                     .replace(/{team}/g, item.team)
                     .replace(/{name}/g, item.name)
                     .replace(/{time}/g, item.time);
+                
+                // Fix Pronunciation
+                text = fixPronunciation(rawText);
             }
 
             try {
@@ -388,12 +411,12 @@
 
         btn.disabled = false;
         btn.innerHTML = "<span>⚡ RE-GENERATE</span>";
-        document.getElementById('statusText').innerText = "Ready to Announce";
-        document.getElementById('statusText').classList.add('ready');
+        setStatus("Audio Ready. Spacebar to Announce.", "ready");
         currentIndex = 0;
         highlightCurrent();
     }
 
+    // --- RENDER & LOGIC ---
     function renderList() {
         const container = document.getElementById('listContainer');
         container.innerHTML = "";
@@ -412,8 +435,13 @@
                 el.innerHTML = `<span>HEAT ${item.heat}</span> <span style="font-size:0.8rem; font-weight:normal;">(Press Space)</span>`;
             } else {
                 el = document.createElement('div');
-                el.className = 'swimmer-card';
+                el.className = `swimmer-card ${item.scratched ? 'scratched' : ''}`;
                 el.id = item.id;
+                
+                // Button HTML
+                const btnText = item.scratched ? "UNDO" : "SCRATCH";
+                const btnClass = item.scratched ? "scratch-btn is-scratched" : "scratch-btn";
+                
                 el.innerHTML = `
                     <div class="lane-box">${item.lane}</div>
                     <div class="info-box">
@@ -421,14 +449,24 @@
                         <div class="team-text">${item.team}</div>
                     </div>
                     ${item.time ? `<div class="time-text">${item.time}</div>` : ''}
+                    <button class="${btnClass}" onclick="toggleScratch(event, ${index})">${btnText}</button>
                     <div class="audio-indicator"></div>
                 `;
             }
-            el.onclick = () => { currentIndex = index; highlightCurrent(); playCurrent(); };
+            el.onclick = (e) => { 
+                // Don't select if clicking the scratch button
+                if(e.target.tagName === 'BUTTON') return;
+                currentIndex = index; highlightCurrent(); playCurrent(); 
+            };
             container.appendChild(el);
         });
-        currentIndex = 0;
         highlightCurrent();
+    }
+
+    function toggleScratch(e, index) {
+        e.stopPropagation(); // Stop card click
+        appData[index].scratched = !appData[index].scratched;
+        renderList(); // Re-render to show gray out
     }
 
     function highlightCurrent() {
@@ -440,23 +478,47 @@
     }
 
     function playCurrent() {
-        if (!appData[currentIndex]) return;
-        const id = appData[currentIndex].id;
-        if (audioCache[id]) {
-            audioCache[id].currentTime = 0;
-            audioCache[id].play();
-            document.getElementById('statusText').innerText = "Speaking...";
+        const item = appData[currentIndex];
+        if (!item) return;
+        if (item.scratched) { setStatus("Skipping Scratched Swimmer...", "working"); return; }
+        
+        if (audioCache[item.id]) {
+            audioCache[item.id].currentTime = 0;
+            audioCache[item.id].play();
+            setStatus("Speaking...", "working");
         } else {
-            // Optional: fallback to browser TTS if audio not generated
-            if (confirm("Audio not generated yet. Generate now?")) generateAudio();
+            if (confirm("Audio not generated. Generate now?")) generateAudio();
         }
     }
 
+    // --- SMART NAVIGATION ---
     document.addEventListener('keydown', (e) => {
         if (appData.length === 0) return;
+        
         if (e.code === 'Space') { e.preventDefault(); playCurrent(); } 
-        else if (e.code === 'ArrowDown') { e.preventDefault(); if (currentIndex < appData.length - 1) { currentIndex++; highlightCurrent(); } } 
-        else if (e.code === 'ArrowUp') { e.preventDefault(); if (currentIndex > 0) { currentIndex--; highlightCurrent(); } }
+        
+        else if (e.code === 'ArrowDown') { 
+            e.preventDefault(); 
+            let next = currentIndex + 1;
+            // Skip Scratched Items
+            while (next < appData.length && appData[next].scratched) { next++; }
+            
+            if (next < appData.length) { 
+                currentIndex = next; 
+                highlightCurrent(); 
+            }
+        } 
+        else if (e.code === 'ArrowUp') { 
+            e.preventDefault(); 
+            let prev = currentIndex - 1;
+            // Skip Scratched Items Backwards
+            while (prev >= 0 && appData[prev].scratched) { prev--; }
+            
+            if (prev >= 0) { 
+                currentIndex = prev; 
+                highlightCurrent(); 
+            }
+        }
     });
 
 </script>
