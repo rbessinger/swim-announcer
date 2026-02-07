@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v21 (Universal)</title>
+    <title>Swim Announcer Ultimate v22 (Persistent)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -259,11 +259,16 @@
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
         </div>
 
-        <textarea id="modalTemplateInput" style="height:200px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
+        <label>EVENT INTRO SCRIPT</label>
+        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
+
+        <label>SWIMMER SCRIPT</label>
+        <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
         
         <div style="margin-top:10px;">
             <label>Click to Insert Variable:</label>
             <div class="var-chips">
+                <div class="var-chip" onclick="insertVar('{event_title}')">{event_title}</div>
                 <div class="var-chip" onclick="insertVar('{event}')">{event}</div>
                 <div class="var-chip" onclick="insertVar('{event_name}')">{event_name}</div>
                 <div class="var-chip" onclick="insertVar('{heat}')">{heat}</div>
@@ -272,7 +277,6 @@
                 <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
                 <div class="var-chip" onclick="insertVar('{name}')">{name}</div>
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
-                <div class="var-chip" onclick="insertVar('{age}')">{age}</div>
             </div>
         </div>
 
@@ -318,14 +322,23 @@
     }
 
     function syncScript() {
-        const val = document.getElementById('modalTemplateInput').value;
-        document.getElementById('templatePreview').value = val;
-        localStorage.setItem('t_'+currentTab, val);
+        const bodyVal = document.getElementById('modalTemplateInput').value;
+        const introVal = document.getElementById('introScriptInput').value;
+        
+        document.getElementById('templatePreview').value = bodyVal;
+        
+        // Save both fields
+        localStorage.setItem('t_'+currentTab, bodyVal);
+        localStorage.setItem('intro_'+currentTab, introVal);
+        
         markDirty();
     }
 
     function insertVar(text) {
-        const el = document.getElementById('modalTemplateInput');
+        // Decide which box has focus (or default to main script)
+        let el = document.activeElement;
+        if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
+        
         const start = el.selectionStart;
         const end = el.selectionEnd;
         const val = el.value;
@@ -342,6 +355,12 @@
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.",
         3: "In {place} place, with a time of {time}, from {team}, {name}."
     };
+    const defaultIntros = {
+        1: "Now swimming {event_title}.",
+        2: "Ladies and gentlemen, welcome to the finals for {event_title}.",
+        3: "Here are the results for {event_title}."
+    };
+
     let currentTab = 1;
     
     function switchTab(t) { 
@@ -354,9 +373,12 @@
     }
     
     function loadTemplateUI() { 
-        const val = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
-        document.getElementById('templatePreview').value = val;
-        document.getElementById('modalTemplateInput').value = val;
+        const bodyVal = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
+        const introVal = localStorage.getItem('intro_'+currentTab) || defaultIntros[currentTab];
+        
+        document.getElementById('templatePreview').value = bodyVal;
+        document.getElementById('modalTemplateInput').value = bodyVal;
+        document.getElementById('introScriptInput').value = introVal;
     }
     
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
@@ -445,22 +467,16 @@
         for(let i=0; i<lines.length; i++) {
             let line = lines[i].trim();
             
-            // 1. EVENT DETECTION (UNIVERSAL)
-            // Case A: "Event 101 Girls 50 Free..." (One Line)
             const evtMatch = line.match(/^Event\s+(\d+)\s+(.*)/i);
             if(evtMatch) {
                 currentEvent = evtMatch[1];
                 currentEventName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-            } 
-            // Case B: "Event 101" (Split Line)
-            else {
+            } else {
                 const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
                 if(shortEvt) {
                     currentEvent = shortEvt[1];
-                    // Peek ahead
                     if (i + 1 < lines.length) {
                         let nextLine = lines[i+1].trim();
-                        // If next line is not Heat or Lane, assume it is description
                         if (!nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
                             currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
                         }
@@ -468,21 +484,13 @@
                 }
             }
 
-            // 2. HEAT DETECTION
             const hMatch = line.match(/Heat\s+(\d+)/i);
             if(hMatch) currentHeat = hMatch[1];
             if(line.includes("Alternates")) currentHeat = null;
 
-            // 3. ROW DETECTION (UNIVERSAL)
-            // Try Heat Sheet Format first
             let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
             let mode = "heat";
-
-            // If fail, try Results Format (Rank Name Age Team Time)
-            // e.g. "1 Ma, Annie 9 Patriot..."
             if(!m) {
-                // Regex: Rank(1-2) Name(text) Age(1-2) Team(text) ... Time(decimal)
-                // We ignore seed time if present, grab last time
                 m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
                 mode = "result";
             }
@@ -502,7 +510,6 @@
                     }
                 }
 
-                // If Result Mode, we fake a heat "1" if none exists so they group together
                 if(mode === "result" && !currentHeat) currentHeat = "1";
 
                 const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
@@ -514,8 +521,8 @@
                     event: currentEvent,
                     eventName: currentEventName,
                     heat: currentHeat,
-                    lane: m[1], // In results mode, this is Rank/Place
-                    place: m[1], // Explicit place variable
+                    lane: m[1], 
+                    place: m[1], 
                     name: rawName, 
                     age: m[3],
                     team: rawTeam, 
@@ -625,7 +632,8 @@
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
         
-        const template = document.getElementById('modalTemplateInput').value;
+        const template = document.getElementById('modalTemplateInput').value; 
+        const introTemplate = document.getElementById('introScriptInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
@@ -637,10 +645,21 @@
             const hId = `h_${heatKey}`;
             
             if (forceRegen || !audioCache[hId]) {
-                let introText = `Now swimming ${group.title}.`;
-                if(group.swimmers[0].eventName) {
-                    introText = `Now swimming Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}. Heat ${group.swimmers[0].heat}.`;
-                }
+                // Use the custom Intro Template
+                let introText = introTemplate;
+                // Build Title (Event + Name)
+                let eventTitle = `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}`;
+                if (group.swimmers[0].heat) eventTitle += `, Heat ${group.swimmers[0].heat}`;
+                else eventTitle += ", Results"; // Fallback for results mode
+
+                introText = introText.replace(/{event_title}/g, eventTitle);
+                
+                // Also support individual variables in intro if user wants
+                introText = introText
+                    .replace(/{event}/g, group.swimmers[0].event)
+                    .replace(/{event_name}/g, group.swimmers[0].eventName)
+                    .replace(/{heat}/g, group.swimmers[0].heat);
+
                 introText = applyHype(introText);
                 queue.push({ id: hId, text: introText });
             }
@@ -648,7 +667,11 @@
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
+                    // Build Event Title variable for swimmer scripts
+                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+
                     let txt = template
+                        .replace(/{event_title}/g, sEventTitle)
                         .replace(/{event}/g, s.event)
                         .replace(/{event_name}/g, s.eventName)
                         .replace(/{heat}/g, s.heat)
@@ -738,9 +761,7 @@
     }
 
     document.addEventListener('keydown', (e) => {
-        // IGNORE if typing in a text field
         if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
-
         if(!heats || Object.keys(heats).length === 0) return;
         if(e.code === 'Space') { e.preventDefault(); triggerGo(); } 
         else if(e.code === 'ArrowDown') navigate(1);
@@ -754,10 +775,7 @@
             heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
         });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
-        
-        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; 
-        else currIdx += dir;
-        
+        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
         if(currIdx >= 0 && currIdx < flatMap.length) {
             currentSelection = flatMap[currIdx]; renderBoard();
             const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
