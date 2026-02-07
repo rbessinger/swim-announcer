@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v7 (Debug Mode)</title>
+    <title>Swim Announcer Ultimate v8 (Event Aware)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -83,7 +83,7 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate v7 (Debug)</h2>
+        <h2>🏊 Ultimate v8 (Fixed)</h2>
     </div>
     
     <div class="scroll-area">
@@ -122,7 +122,7 @@
         
         <div>
             <label style="color:var(--orange);">⚠️ RAW DATA (DEBUG)</label>
-            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">If empty after upload, PDF is unreadable. If text exists, edit and click Parse.</div>
+            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">Check this box if names aren't loading.</div>
             <textarea id="dataInput" style="height:150px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text will appear here..."></textarea>
             <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
         </div>
@@ -159,7 +159,7 @@
     <div class="list-container" id="listContainer">
         <div style="text-align:center; color:#94a3b8; margin-top:100px;">
             <h3>Welcome to Heat Manager</h3>
-            <p>Upload a PDF. If nothing appears, check the "Raw Data" box.</p>
+            <p>Upload a PDF to see heats sorted by Event.</p>
         </div>
     </div>
 </div>
@@ -185,7 +185,7 @@
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
     function setStatus(msg, type) { const el = document.getElementById('statusText'); el.innerText = msg; el.className = 'status '+type; }
 
-    // --- PDF ENGINE (LOOSE MODE) ---
+    // --- PDF ENGINE ---
     async function handlePdfUpload(input) {
         if (!input.files[0]) return;
         setStatus("Reading PDF...", "working");
@@ -221,7 +221,7 @@
             
             if(count === 0) {
                 setStatus("Auto-parse failed. Check Raw Data box.", "error");
-                alert("I couldn't find any swimmers automatically. Please check the 'Raw Data' box on the left to see what the PDF looks like.");
+                alert("I couldn't find any swimmers. Check the Raw Data box to see if the PDF text is readable.");
             } else {
                 setStatus(`Found ${count} swimmers.`, "ready");
             }
@@ -229,41 +229,84 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER ---
+    // --- PARSER (FIXED FOR YOUR FORMAT) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const lines = raw.split('\n');
         let parsedData = [];
+        let currentEvent = "Unknown";
         let currentHeat = null;
 
         lines.forEach(line => {
             line = line.trim();
-            // HEAT DETECTION
+            
+            // 1. Detect Event Header (e.g., "Event 101 Girls...")
+            const evtMatch = line.match(/Event\s+(\d+)/i);
+            if(evtMatch) {
+                currentEvent = evtMatch[1];
+            }
+
+            // 2. Detect Heat Header (e.g., "Heat 1 of 1 Semis")
             const hMatch = line.match(/Heat\s+(\d+)/i);
-            if(hMatch) currentHeat = hMatch[1];
-            if(line.includes("Alternates")) currentHeat = null;
+            if(hMatch) {
+                currentHeat = hMatch[1];
+            }
+            
+            // Reset on "Alternates" line
+            if(line.includes("Alternates")) {
+                currentHeat = null;
+            }
 
             if(currentHeat) {
-                // LOOSE MATCHING: Look for "Lane Digit" + "Time"
-                // Regex: Name (start), Lane (digit 1-2), Age (digit), Team (text), Time (decimal)
-                const m = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
+                // 3. Detect Swimmer: LANE FIRST
+                // Format: Lane (1-2 digits) Name (text) Age (digits) Team (text) Time (digits:digits)
+                // Regex Breakdown:
+                // ^(\d{1,2})     -> Lane (Starts line)
+                // \s+            -> Space
+                // (.+?)          -> Name (Lazy match until next digit)
+                // \s+            -> Space
+                // (\d{1,2})      -> Age
+                // \s+            -> Space
+                // (.+?)          -> Team
+                // \s+            -> Space
+                // (\d+[:\.]\d{2}) -> Time (e.g. 26.38)
+                const m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(\d{1,2}[:\.]\d{2})/);
+                
                 if(m) {
-                    parsedData.push({ heat: currentHeat, name: m[1].trim(), lane: m[2], team: m[3].trim(), time: m[4] });
+                    // Create a unique Heat Key so Event 101 Heat 1 != Event 102 Heat 1
+                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+                    const displayTitle = `Event ${currentEvent} - Heat ${currentHeat}`;
+                    
+                    parsedData.push({ 
+                        heatId: uniqueHeatId,
+                        heatTitle: displayTitle,
+                        lane: m[1], 
+                        name: m[2].trim(), 
+                        age: m[3],
+                        team: m[4].trim(), 
+                        time: m[5] 
+                    });
                 }
             }
         });
         
         if (parsedData.length === 0 && !silent) {
-            alert("Parser found 0 swimmers. Ensure format is: Name Lane Age Team Time");
+            alert("Parser found 0 swimmers. Ensure format matches the Stevenson HS layout.");
             return 0;
         }
 
         heats = {}; heatOrder = [];
         parsedData.forEach(s => {
-            if(!heats[s.heat]) { heats[s.heat] = []; heatOrder.push(s.heat); }
-            heats[s.heat].push({ ...s, scratched: false, id: `s_${s.heat}_${s.lane}` });
+            if(!heats[s.heatId]) { 
+                heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; 
+                heatOrder.push(s.heatId); 
+            }
+            heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
         });
-        heatOrder.sort((a,b) => parseInt(a)-parseInt(b));
+        
+        // Sort Heats by Event Number then Heat Number
+        // E101-H1 vs E102-H1
+        heatOrder.sort(); 
         
         renderBoard();
         return parsedData.length;
@@ -280,7 +323,10 @@
         }
         
         heatOrder.forEach(heatKey => {
-            const swimmers = heats[heatKey];
+            const group = heats[heatKey];
+            const swimmers = group.swimmers;
+            
+            // Sort by Lane
             swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
 
             const heatBlock = document.createElement('div');
@@ -288,7 +334,7 @@
             
             const header = document.createElement('div');
             header.className = 'heat-header';
-            header.innerHTML = `<div class="heat-title">HEAT ${heatKey}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
+            header.innerHTML = `<div class="heat-title">${group.title}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
             header.onclick = () => playHeatIntro(heatKey);
             if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
             
@@ -330,11 +376,11 @@
     function drop(e, targetHeat, targetIndex) {
         e.preventDefault();
         if(!dragSrc) return;
-        const srcList = heats[dragSrc.heat];
+        const srcList = heats[dragSrc.heat].swimmers;
         const swimmer = srcList[dragSrc.index];
         srcList.splice(dragSrc.index, 1);
         
-        const targetList = heats[targetHeat];
+        const targetList = heats[targetHeat].swimmers;
         const targetSwimmer = targetList[targetIndex];
         swimmer.lane = targetSwimmer.lane; 
         
@@ -346,8 +392,8 @@
         markDirty(); renderBoard();
     }
 
-    function updateData(heat, idx, field, el) { heats[heat][idx][field] = el.innerText; markDirty(); }
-    function toggleScratch(heat, idx) { heats[heat][idx].scratched = !heats[heat][idx].scratched; renderBoard(); }
+    function updateData(heat, idx, field, el) { heats[heat].swimmers[idx][field] = el.innerText; markDirty(); }
+    function toggleScratch(heat, idx) { heats[heat].swimmers[idx].scratched = !heats[heat].swimmers[idx].scratched; renderBoard(); }
     function selectSwimmer(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); playCurrent(); }
 
     async function generateAudio() {
@@ -362,13 +408,17 @@
         const voice = document.getElementById('voiceSelect').value;
         
         audioCache = {}; 
-        let total = 0; Object.values(heats).forEach(list => total += list.length); let count = 0;
+        let total = 0; Object.values(heats).forEach(g => total += g.swimmers.length); let count = 0;
 
         for (const heatKey of heatOrder) {
+            const group = heats[heatKey];
             const hId = `h_${heatKey}`;
-            try { const res = await fetchAI(`Now swimming heat ${heatKey}.`, voice, key); if(res) audioCache[hId] = res; } catch(e) {}
+            
+            // Intro: "Now swimming Event 101, Heat 1"
+            const introText = `Now swimming ${group.title}.`;
+            try { const res = await fetchAI(introText, voice, key); if(res) audioCache[hId] = res; } catch(e) {}
 
-            for (const s of heats[heatKey]) {
+            for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 let txt = template.replace(/{lane}/g, s.lane).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
                 for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
@@ -391,12 +441,12 @@
     function playHeatIntro(heat) {
         currentSelection = { heat: heat, index: -1 }; renderBoard();
         const aud = audioCache[`h_${heat}`];
-        if(aud) { aud.currentTime=0; aud.play(); setStatus(`Announcing Heat ${heat}...`, "working"); }
+        if(aud) { aud.currentTime=0; aud.play(); setStatus(`Announcing ${heats[heat].title}...`, "working"); }
     }
     function playCurrent() {
         const { heat, index } = currentSelection;
         if(index === -1) { playHeatIntro(heat); return; }
-        const s = heats[heat][index];
+        const s = heats[heat].swimmers[index];
         if(s.scratched) return;
         const aud = audioCache[s.id];
         if(aud) { aud.currentTime=0; aud.play(); setStatus(`Announcing Lane ${s.lane}...`, "working"); } else { setStatus("Audio not generated yet.", "working"); }
@@ -413,7 +463,7 @@
         let flatMap = [];
         heatOrder.forEach(h => {
             flatMap.push({ heat: h, index: -1 }); 
-            heats[h].forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
+            heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
         });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
         if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
