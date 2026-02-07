@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v14 (Modal Settings)</title>
+    <title>Swim Announcer Ultimate v15 (Turbo)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -17,12 +17,22 @@
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
         .settings-btn:hover { color: white; transform: rotate(90deg); }
 
-        .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; position: relative; }
+
+        /* VIEW TOGGLING */
+        .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
+        .view-section.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; display: block; margin-bottom: 6px; color: #64748b; }
         input[type="text"], input[type="password"], textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
         input:focus, textarea:focus { border-color: var(--accent); outline: none; }
         
+        /* CHECKBOX */
+        .checkbox-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .checkbox-row input { width: auto; accent-color: var(--accent); cursor: pointer; }
+        .checkbox-row span { font-size: 0.8rem; color: #cbd5e1; }
+
         /* SLIDERS */
         input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
         .slider-group { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
@@ -119,59 +129,91 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 RUN SHOW</h2>
+        <h2 id="sidebarTitle">🏊 RUN SHOW</h2>
         <button class="settings-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
     </div>
     
     <div class="scroll-area">
         
-        <div>
-            <label>1. Upload Meet Program</label>
-            <label class="file-upload-box">
-                <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
-                <div class="file-upload-text">Click to upload PDF</div>
-                <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
-            </label>
-        </div>
-
-        <div>
-            <label>Name Format</label>
-            <select id="nameFormatSelect" onchange="manualParse()">
-                <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
-                <option value="first_last">First Last (e.g. Esmae Shen)</option>
-            </select>
-        </div>
-
-        <div>
-            <label>2. Script Template</label>
-            <div class="template-tabs">
-                <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
-                <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
+        <div id="viewMain" class="view-section active">
+            <div>
+                <label>1. Upload Meet Program</label>
+                <label class="file-upload-box">
+                    <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
+                    <div class="file-upload-text">Click to upload PDF</div>
+                    <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
+                </label>
             </div>
-            <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
-        </div>
 
-        <div>
-            <label>3. Voice & Hype</label>
-            <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
-                <option value="nova">Nova (Energetic) 🔥</option>
-                <option value="onyx">Onyx (Announcer) 🎙️</option>
-                <option value="alloy">Alloy (Balanced)</option>
-                <option value="echo">Echo (Soft)</option>
-                <option value="shimmer">Shimmer (Clear)</option>
-            </select>
+            <div>
+                <label>Name Format</label>
+                <select id="nameFormatSelect" onchange="manualParse()">
+                    <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
+                    <option value="first_last">First Last (e.g. Esmae Shen)</option>
+                </select>
+            </div>
 
-            <div class="slider-group">
-                <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
-                <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
-                <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
+            <div>
+                <label>2. Script Template</label>
+                <div class="template-tabs">
+                    <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
+                    <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
+                </div>
+                <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
+            </div>
+
+            <div>
+                <label>3. Voice & Hype</label>
+                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
+                    <option value="nova">Nova (Energetic) 🔥</option>
+                    <option value="onyx">Onyx (Announcer) 🎙️</option>
+                    <option value="alloy">Alloy (Balanced)</option>
+                    <option value="echo">Echo (Soft)</option>
+                    <option value="shimmer">Shimmer (Clear)</option>
+                </select>
+
+                <div class="slider-group">
+                    <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
+                    <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
+                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
+                </div>
             </div>
         </div>
+
+        <div id="viewSettings" class="view-section">
+            <div>
+                <label>OpenAI API Key</label>
+                <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
+                <div style="font-size:0.65rem; color:#64748b; margin-top:5px;">Key is saved to your browser cache.</div>
+            </div>
+            
+            <div>
+                <label>Phonetic Dictionary</label>
+                <textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()">
+{
+  "Nguyen": "Win",
+  "Gavrilos": "Gah-vree-los"
+}
+                </textarea>
+            </div>
+
+            <div>
+                <label style="color:var(--orange);">Raw Data (Debug)</label>
+                <textarea id="dataInput" style="height:100px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
+                <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
+            </div>
+        </div>
+
     </div>
 
     <div class="action-area">
+        <label class="checkbox-row" style="margin-bottom:10px;">
+            <input type="checkbox" id="forceRegen">
+            <span>Force Re-Generate All</span>
+        </label>
+        
         <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
-            <span>⚡ GENERATE AUDIO</span>
+            <span>⚡ GENERATE AUDIO (TURBO)</span>
         </button>
         <div class="progress-bar" id="progressBar">
             <div class="progress-fill" id="progressFill"></div>
@@ -241,6 +283,7 @@
     let heatOrder = []; 
     let audioCache = {}; 
     let currentSelection = { heat: null, index: -1 }; 
+    let isSettingsOpen = false;
 
     window.onload = () => {
         if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
@@ -468,7 +511,7 @@
 
     async function generateAudio() {
         const key = document.getElementById('apiKey').value;
-        if(!key.startsWith('sk-')) { alert("Missing API Key"); toggleSettings(); return; }
+        if(!key.startsWith('sk-')) { alert("Missing API Key. Check Settings."); toggleSettings(); return; }
         
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
@@ -476,34 +519,69 @@
         const template = document.getElementById('templateInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
+        const forceRegen = document.getElementById('forceRegen').checked;
         
-        audioCache = {}; 
-        let total = 0; Object.values(heats).forEach(g => total += g.swimmers.length); let count = 0;
-
+        // --- PARALLEL QUEUE ---
+        const queue = [];
+        
+        // Build Task List
         for (const heatKey of heatOrder) {
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
             
-            const introText = applyHype(`Now swimming ${group.title}.`);
-            try { const res = await fetchAI(introText, voice, key); if(res) audioCache[hId] = res; } catch(e) {}
+            // Only add task if forced OR missing from cache
+            if (forceRegen || !audioCache[hId]) {
+                const introText = applyHype(`Now swimming ${group.title}.`);
+                queue.push({ id: hId, text: introText });
+            }
 
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
-                let txt = template
-                    .replace(/{event}/g, s.event)
-                    .replace(/{heat}/g, s.heat)
-                    .replace(/{lane}/g, s.lane)
-                    .replace(/{age}/g, s.age)
-                    .replace(/{team}/g, s.team)
-                    .replace(/{name}/g, s.name)
-                    .replace(/{time}/g, s.time);
+                if (forceRegen || !audioCache[s.id]) {
+                    let txt = template
+                        .replace(/{event}/g, s.event)
+                        .replace(/{heat}/g, s.heat)
+                        .replace(/{lane}/g, s.lane)
+                        .replace(/{age}/g, s.age)
+                        .replace(/{team}/g, s.team)
+                        .replace(/{name}/g, s.name)
+                        .replace(/{time}/g, s.time);
 
-                for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                txt = applyHype(txt);
-                try { const res = await fetchAI(txt, voice, key); if(res) audioCache[s.id] = res; } catch(e) {}
-                count++; document.getElementById('progressFill').style.width = (count/total*100)+"%";
+                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+                    txt = applyHype(txt);
+                    queue.push({ id: s.id, text: txt });
+                }
             }
         }
+
+        // --- EXECUTE WORKERS (Turbo Mode) ---
+        const CONCURRENCY = 5;
+        let completed = 0;
+        const total = queue.length;
+        
+        if (total === 0) {
+            btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready");
+            return;
+        }
+
+        setStatus(`Generating ${total} audio files...`, "working");
+
+        async function worker() {
+            while (queue.length > 0) {
+                const task = queue.shift();
+                try {
+                    const res = await fetchAI(task.text, voice, key);
+                    if(res) audioCache[task.id] = res;
+                } catch(e) { console.error(e); }
+                completed++;
+                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+            }
+        }
+
+        const workers = [];
+        for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+        await Promise.all(workers);
+
         btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
