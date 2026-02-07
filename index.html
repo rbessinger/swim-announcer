@@ -2,19 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v32 (Perfect Merge)</title>
+    <title>Swim Announcer Ultimate v33 (Rock Solid)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V28 LAYOUT ENGINE --- */
+        /* --- V20 STABLE BASE STYLING --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
         /* SIDEBAR */
-        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 50; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
@@ -22,6 +22,7 @@
 
         .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
 
+        /* TAB TOGGLING FOR SETTINGS */
         .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
         .view-section.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -40,7 +41,7 @@
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
         input[type="file"] { display: none; }
 
-        /* TABS */
+        /* BUTTON TABS */
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
         .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; transition: 0.2s; }
         .tab-btn:hover { background: #334155; }
@@ -62,9 +63,9 @@
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
-        /* MAIN DASHBOARD */
+        /* MAIN DASHBOARD (Z-INDEX FIXED) */
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
-        .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 10; flex-shrink: 0; }
+        .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 1000; flex-shrink: 0; }
         
         .status { font-weight: bold; font-size: 0.9rem; color: #64748b; }
         .status.ready { color: var(--green); }
@@ -115,7 +116,7 @@
         .go-label { font-size: 0.8rem; font-weight: normal; opacity: 0.8; margin-top: -5px; }
 
         /* MODALS */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; }
         .modal-content { background: #0f172a; width: 700px; padding: 30px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -200,49 +201,56 @@
             <input type="checkbox" id="forceRegen">
             <span>Force Re-Gen</span>
         </label>
-        
-        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
-            <span>⚡ GENERATE AUDIO (TURBO)</span>
-        </button>
-        <div class="progress-bar" id="progressBar">
-            <div class="progress-fill" id="progressFill"></div>
+        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO (TURBO)</span></button>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="top-bar">
+        <div>
+            <span style="font-weight: bold;">Status:</span> 
+            <span id="statusText" class="status">Waiting for PDF...</span>
         </div>
+        <div style="font-size: 0.85rem; color: #64748b;">
+            <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
+        </div>
+    </div>
+
+    <div class="list-container" id="listContainer">
+        <div style="text-align:center; color:#94a3b8; margin-top:100px;">
+            <h3>Welcome to Heat Manager</h3>
+            <p>Upload a PDF or Image to see heats.</p>
+        </div>
+    </div>
+
+    <div class="go-container" id="goBtnContainer">
+        <button class="btn-go" onclick="triggerGo()">GO<span class="go-label">(Space)</span></button>
     </div>
 </div>
 
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) toggleSettings()">
     <div class="modal-content">
-        <div class="modal-header">
-            <div class="modal-title">⚙️ SETTINGS</div>
-            <button class="close-btn" onclick="toggleSettings()">&times;</button>
-        </div>
-        
+        <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v32.0 (Perfect Merge)</div>
+        <div class="version-tag">v33.0 (Rock Solid)</div>
     </div>
 </div>
 
 <div class="modal-overlay" id="scriptModal" onclick="if(event.target===this) toggleScriptEditor()">
     <div class="modal-content" style="width:700px;">
-        <div class="modal-header">
-            <div class="modal-title">✏️ SCRIPT EDITOR</div>
-            <button class="close-btn" onclick="toggleScriptEditor()">&times;</button>
-        </div>
-
+        <div class="modal-header"><div class="modal-title">✏️ SCRIPT EDITOR</div><button class="close-btn" onclick="toggleScriptEditor()">&times;</button></div>
         <div class="template-tabs" style="margin-bottom:15px;">
             <button class="tab-btn active" id="modalTab1" onclick="switchTab(1)">1. Heats</button>
             <button class="tab-btn" id="modalTab2" onclick="switchTab(2)">2. Finalists</button>
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
         </div>
-
         <label>EVENT INTRO SCRIPT</label>
         <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
-
         <label>SWIMMER SCRIPT</label>
         <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
-        
         <div style="margin-top:10px;">
             <label>Click to Insert Variable:</label>
             <div class="var-chips">
@@ -257,18 +265,13 @@
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
             </div>
         </div>
-
         <button class="btn-gen" onclick="toggleScriptEditor()" style="margin-top:20px;">DONE</button>
     </div>
 </div>
 
 <script>
-    let heats = {}; 
-    let heatOrder = []; 
-    let audioCache = {}; 
-    let currentSelection = { heat: null, index: -1 }; 
-    let isSettingsOpen = false;
-    let isScriptOpen = false;
+    let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
+    let isSettingsOpen = false; let isScriptOpen = false;
 
     // --- PHONETIC MEGA PACK (Pre-Loaded) ---
     const MEGA_DICT = {
@@ -276,22 +279,15 @@
     };
 
     window.onload = () => {
-        // Init Config
-        if(localStorage.getItem('openai_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
-            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
-        }
+        if(localStorage.getItem('openai_key')) { document.getElementById('apiKey').value = localStorage.getItem('openai_key'); document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key'); }
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
         
-        // Init Dictionary
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
-        
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
-        loadTemplateUI();
-        updateSliders();
+        loadTemplateUI(); updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
@@ -306,16 +302,8 @@
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
-    const defaultTemplates = { 
-        1: "In lane {lane}, representing {team}, {name}.", 
-        2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
-        3: "In {place} place, with a time of {time}, from {team}, {name}." 
-    };
-    const defaultIntros = { 
-        1: "Now swimming {event_title}.", 
-        2: "Ladies and gentlemen, please welcome the finalists for {event_title}.", 
-        3: "And now, the results for {event_title}." 
-    };
+    const defaultTemplates = { 1: "In lane {lane}, representing {team}, {name}.", 2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 3: "In {place} place, with a time of {time}, from {team}, {name}." };
+    const defaultIntros = { 1: "Now swimming {event_title}.", 2: "Ladies and gentlemen, please welcome the finalists for {event_title}.", 3: "And now, the results for {event_title}." };
     let currentTab = 1;
 
     function switchTab(t) { 
@@ -357,7 +345,7 @@
         return text;
     }
 
-    // --- UPLOAD HANDLER (PDF + IMAGE) ---
+    // --- FILE HANDLING (Strictly PDF/IMG Only) ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
@@ -410,89 +398,92 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- SMART PARSER (From V30) ---
+    // --- PARSER ---
     function manualParse(silent = false) {
-        const raw = document.getElementById('dataInput').value;
-        const nameFormat = document.getElementById('nameFormatSelect').value; 
-        const lines = raw.split('\n');
-        let parsedData = [];
-        let currentEvent = "Unknown";
-        let currentEventName = "";
-        let currentHeat = null;
+        try {
+            const raw = document.getElementById('dataInput').value;
+            const nameFormat = document.getElementById('nameFormatSelect').value; 
+            const lines = raw.split('\n');
+            let parsedData = [];
+            let currentEvent = "Unknown";
+            let currentEventName = "";
+            let currentHeat = null;
 
-        for(let i=0; i<lines.length; i++) {
-            let line = lines[i].trim();
-            
-            // 1. EVENT DETECTION
-            const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
-            if(evtMatch) {
-                currentEvent = evtMatch[1];
-                let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-                if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
-            } 
-            else {
-                const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
-                if(shortEvt) {
-                    currentEvent = shortEvt[1];
-                    for(let j=1; j<=2; j++) {
-                        if (i+j < lines.length) {
-                            let nextLine = lines[i+j].trim();
-                            if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
-                                currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
-                                break;
+            for(let i=0; i<lines.length; i++) {
+                let line = lines[i].trim();
+                
+                // 1. EVENT
+                const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
+                if(evtMatch) {
+                    currentEvent = evtMatch[1];
+                    let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
+                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
+                } 
+                else {
+                    const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
+                    if(shortEvt) {
+                        currentEvent = shortEvt[1];
+                        // Peek
+                        for(let j=1; j<=2; j++) {
+                            if (i+j < lines.length) {
+                                let nextLine = lines[i+j].trim();
+                                if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
+                                    currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
+                                    break;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // 2. HEAT DETECTION
-            const hMatch = line.match(/Heat\s+(\d+)/i);
-            if(hMatch) currentHeat = hMatch[1];
-            if(line.includes("Alternates")) currentHeat = null;
+                // 2. HEAT
+                const hMatch = line.match(/Heat\s+(\d+)/i);
+                if(hMatch) currentHeat = hMatch[1];
+                if(line.includes("Alternates")) currentHeat = null;
 
-            // 3. ROW DETECTION
-            let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-            let mode = "heat";
-            if(!m) {
-                m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
-                mode = "result";
-            }
-
-            if(m && (currentHeat || mode === "result")) {
-                let rawName = m[2].trim();
-                let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
-                if (nameFormat === 'last_first' && rawName.includes(',')) {
-                    const parts = rawName.split(',');
-                    if(parts.length >= 2) {
-                        let last = parts[0].trim();
-                        let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
-                        rawName = `${first} ${last}`;
-                    }
+                // 3. ROW
+                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                let mode = "heat";
+                if(!m) {
+                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
+                    mode = "result";
                 }
-                if(mode === "result" && !currentHeat) currentHeat = "1";
 
-                const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
-                
-                parsedData.push({ 
-                    heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
-                    heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
-                    time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
-                });
+                if(m && (currentHeat || mode === "result")) {
+                    let rawName = m[2].trim();
+                    let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+                    if (nameFormat === 'last_first' && rawName.includes(',')) {
+                        const parts = rawName.split(',');
+                        if(parts.length >= 2) {
+                            let last = parts[0].trim();
+                            let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
+                            rawName = `${first} ${last}`;
+                        }
+                    }
+                    if(mode === "result" && !currentHeat) currentHeat = "1";
+
+                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+                    const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
+                    
+                    parsedData.push({ 
+                        heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
+                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
+                        time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
+                    });
+                }
             }
-        }
-        
-        if (parsedData.length === 0 && !silent) return 0;
+            
+            if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
 
-        heats = {}; heatOrder = [];
-        parsedData.forEach(s => {
-            if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
-            heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_s${s.lane}` });
-        });
-        heatOrder.sort(); 
-        renderBoard();
-        return parsedData.length;
+            heats = {}; heatOrder = [];
+            parsedData.forEach(s => {
+                if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
+                heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
+            });
+            heatOrder.sort(); 
+            renderBoard();
+            return parsedData.length;
+        } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
     }
 
     function renderBoard() {
@@ -508,11 +499,9 @@
             const heatBlock = document.createElement('div');
             heatBlock.className = 'heat-block';
             
-            // Header Text showing event details
-            let headerText = group.title;
             const header = document.createElement('div');
             header.className = 'heat-header';
-            header.innerHTML = `<div class="heat-title">${headerText}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
+            header.innerHTML = `<div class="heat-title">${group.title}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
             header.onclick = () => selectCue(heatKey, -1);
             if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
             heatBlock.appendChild(header);
