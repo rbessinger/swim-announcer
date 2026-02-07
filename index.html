@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v42 (OpenAI Only)</title>
+    <title>Swim Announcer Ultimate v43 (ElevenLabs Returned)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V42 LAYOUT --- */
+        /* --- STABLE V43 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -174,9 +174,19 @@
             </div>
 
             <div>
-                <label>3. Select Voice</label>
-                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
-                    </select>
+                <label>3. Select Engine</label>
+                <select id="engineSelect" onchange="updateVoiceOptions()" style="margin-bottom:10px;">
+                    <option value="openai">OpenAI (Fast & Cheap)</option>
+                    <option value="elevenlabs">ElevenLabs (High Quality)</option>
+                </select>
+
+                <label>Voice Model</label>
+                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;"></select>
+                
+                <div id="customVoiceDiv" style="display:none; margin-bottom:10px;">
+                    <label style="color:var(--accent);">Custom Voice ID</label>
+                    <input type="text" id="customVoiceId" placeholder="Paste ID from ElevenLabs..." onchange="saveConfig()">
+                </div>
 
                 <div class="slider-group">
                     <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
@@ -193,6 +203,7 @@
 
         <div id="viewSettings" class="view-section">
             <div><label>OpenAI API Key</label><input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()"></div>
+            <div><label>ElevenLabs API Key</label><input type="password" id="elevenKey" placeholder="xi-..." onchange="saveConfig()"></div>
             <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea></div>
             <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea></div>
         </div>
@@ -203,7 +214,7 @@
             <input type="checkbox" id="forceRegen">
             <span>Force Re-Gen</span>
         </label>
-        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO (TURBO)</span></button>
+        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO</span></button>
         <button class="btn-reset" onclick="clearSession()">🗑️ CLEAR / NEW MEET</button>
         <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
     </div>
@@ -236,9 +247,10 @@
     <div class="modal-content">
         <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
+        <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v42.0 (OpenAI Only)</div>
+        <div class="version-tag">v43.0 (ElevenLabs Safe Mode)</div>
     </div>
 </div>
 
@@ -293,8 +305,15 @@
             document.getElementById('apiKey').value = localStorage.getItem('openai_key');
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
         }
+        if(localStorage.getItem('eleven_key')) {
+            document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
+            document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
+        }
+        if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
-        // Init Voice Options
+        // Init Engine
+        const savedEngine = localStorage.getItem('engine_pref') || 'openai';
+        document.getElementById('engineSelect').value = savedEngine;
         updateVoiceOptions();
 
         // Init Dict
@@ -317,15 +336,27 @@
         {id:'onyx', name:'Onyx (Announcer)'}, 
         {id:'alloy', name:'Alloy (Balanced)'}, 
         {id:'echo', name:'Echo (Soft)'}, 
-        {id:'shimmer', name:'Shimmer (Clear)'},
-        {id:'fable', name:'Fable (Storyteller)'}
+        {id:'shimmer', name:'Shimmer (Clear)'}
+    ];
+    const VOICES_ELEVEN = [
+        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
+        {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
+        {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
+        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
     ];
 
     function updateVoiceOptions() {
+        const engine = document.getElementById('engineSelect').value;
         const select = document.getElementById('voiceSelect');
+        const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
         
-        VOICES_OPENAI.forEach(v => {
+        // Show Custom Voice Field if ElevenLabs
+        customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
+
+        let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
+        
+        list.forEach(v => {
             const opt = document.createElement('option');
             opt.value = v.id;
             opt.innerText = v.name;
@@ -333,7 +364,11 @@
         });
         
         const savedVoice = localStorage.getItem('voice_id_pref');
-        if(savedVoice) select.value = savedVoice;
+        if(savedVoice) {
+            const exists = list.find(v => v.id === savedVoice);
+            if(exists) select.value = savedVoice;
+        }
+        localStorage.setItem('engine_pref', engine);
     }
 
     // --- SESSION ---
@@ -364,12 +399,17 @@
 
     function saveConfig() { 
         localStorage.setItem('openai_key', cleanInput(document.getElementById('apiKey').value)); 
+        localStorage.setItem('eleven_key', cleanInput(document.getElementById('elevenKey').value)); 
         localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
+        localStorage.setItem('custom_voice_id', cleanInput(document.getElementById('customVoiceId').value));
     }
     function saveConfigFromModal() { 
         const oa = cleanInput(document.getElementById('apiKeyModal').value);
+        const xi = cleanInput(document.getElementById('elevenKeyModal').value);
         document.getElementById('apiKey').value = oa; 
+        document.getElementById('elevenKey').value = xi;
         localStorage.setItem('openai_key', oa);
+        localStorage.setItem('eleven_key', xi);
     }
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
@@ -658,8 +698,16 @@
     }
 
     async function generateAudio() {
+        const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
-        if (!oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+        const xiKey = cleanInput(document.getElementById('elevenKey').value);
+        
+        // Custom Voice ID Logic
+        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
+
+        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
 
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
@@ -693,15 +741,22 @@
             }
         }
 
-        const CONCURRENCY = 5; let completed = 0; const total = queue.length;
+        // --- TRAFFIC CONTROL ---
+        // If ElevenLabs, FORCE single file mode (Concurrency 1) to prevent 429 Errors
+        const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+        
+        let completed = 0; const total = queue.length;
         if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
-        setStatus(`Generating ${total} audio files...`, "working");
+        setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
 
         async function worker() {
             while (queue.length > 0) {
                 const task = queue.shift();
                 try {
-                    let res = await fetchOpenAI(task.text, voice, oaKey);
+                    let res = null;
+                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                    else res = await fetchOpenAI(task.text, voice, oaKey);
+                    
                     if(res) audioCache[task.id] = res;
                 } catch(e) { 
                     console.error(e); 
@@ -717,17 +772,26 @@
     }
 
     async function fetchOpenAI(text, voice, key) {
-        // OpenAI supports speed from 0.25 to 4.0
         const speed = parseFloat(document.getElementById('speedSlider')?.value || 1.0);
-        
-        const r = await fetch("https://api.openai.com/v1/audio/speech", { 
-            method: "POST", 
-            headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, 
-            body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: speed }) 
+        const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: speed }) });
+        if(!r.ok) throw new Error(`OpenAI ${r.status}`);
+        return new Audio(URL.createObjectURL(await r.blob()));
+    }
+
+    async function fetchEleven(text, voiceId, key) {
+        // Use 'eleven_turbo_v2' for faster/cheaper generation
+        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+            method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                text: text, 
+                model_id: "eleven_turbo_v2", 
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 } 
+            })
         });
         if(!r.ok) {
-            const err = await r.json();
-            throw new Error(`OpenAI Error: ${err.error?.message || r.statusText}`);
+            if(r.status === 401) throw new Error("ElevenLabs 401: Invalid Key.");
+            if(r.status === 429) throw new Error("ElevenLabs 429: Rate Limit. Wait a moment.");
+            throw new Error(`ElevenLabs ${r.status}`);
         }
         return new Audio(URL.createObjectURL(await r.blob()));
     }
