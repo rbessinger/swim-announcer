@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v19 (Championship)</title>
+    <title>Swim Announcer Ultimate v20 (Pro Editor)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -38,9 +38,10 @@
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
         input[type="file"] { display: none; }
 
-        /* 3-TAB SYSTEM */
+        /* TABS */
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
-        .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; }
+        .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; transition: 0.2s; }
+        .tab-btn:hover { background: #334155; }
         .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
 
         .action-area { padding: 20px; background: #020617; border-top: 1px solid #1e293b; }
@@ -96,7 +97,10 @@
         .audio-dot { width: 8px; height: 8px; border-radius: 50%; background: #e2e8f0; margin-left: 15px; }
         .has-audio .audio-dot { background: var(--green); box-shadow: 0 0 4px var(--green); }
 
-        .go-container { position: absolute; bottom: 30px; right: 30px; width: 120px; height: 120px; z-index: 100; }
+        .go-container { position: absolute; bottom: 30px; right: 30px; width: 120px; height: 120px; z-index: 100; transition: 0.2s; }
+        /* Dim GO button when editing */
+        .go-container.disabled { opacity: 0.3; pointer-events: none; filter: grayscale(100%); }
+        
         .btn-go { 
             width: 100%; height: 100%; border-radius: 50%; border: 4px solid #14532d; 
             background: var(--green); color: white; font-weight: 900; font-size: 2rem; 
@@ -114,7 +118,7 @@
         }
         .modal-overlay.active { display: flex; }
         .modal-content { 
-            background: #0f172a; width: 500px; padding: 30px; border-radius: 12px; 
+            background: #0f172a; width: 600px; padding: 30px; border-radius: 12px; 
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; 
             color: #94a3b8; display: flex; flex-direction: column; gap: 20px;
         }
@@ -122,6 +126,15 @@
         .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
         .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
         .close-btn:hover { color: white; }
+
+        /* SCRIPT VARIABLES CHIPS */
+        .var-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .var-chip { 
+            background: #1e293b; color: var(--accent); border: 1px solid #334155; 
+            padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-family: monospace; 
+            cursor: pointer; transition: 0.2s; font-weight: bold; 
+        }
+        .var-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
 
     </style>
 </head>
@@ -154,16 +167,16 @@
             </div>
 
             <div>
-                <label>2. Script Template</label>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <label style="margin:0;">2. Script Template</label>
+                    <button onclick="toggleScriptEditor()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.8rem; font-weight:bold;">✏️ Edit</button>
+                </div>
                 <div class="template-tabs">
                     <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">1. Heats</button>
                     <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">2. Finalists</button>
                     <button class="tab-btn" id="btnTab3" onclick="switchTab(3)">3. Results</button>
                 </div>
-                <textarea id="templateInput" style="height:70px;" oninput="markDirty()"></textarea>
-                <div style="font-size:0.65rem; color:#64748b; margin-top:5px; line-height:1.4;">
-                    Vars: <span style="color:var(--accent)">{event} {event_name} {heat} {lane} {team} {name} {time}</span>
-                </div>
+                <textarea id="templatePreview" style="height:60px; opacity:0.7; cursor:pointer;" readonly onclick="toggleScriptEditor()">In lane {lane}, representing {team}, {name}.</textarea>
             </div>
 
             <div>
@@ -243,7 +256,7 @@
         </div>
     </div>
 
-    <div class="go-container">
+    <div class="go-container" id="goBtnContainer">
         <button class="btn-go" onclick="triggerGo()">
             GO
             <span class="go-label">(Space)</span>
@@ -257,28 +270,40 @@
             <div class="modal-title">⚙️ SETTINGS</div>
             <button class="close-btn" onclick="toggleSettings()">&times;</button>
         </div>
+        <p style="color:#64748b;">(Use sidebar settings for now)</p>
+    </div>
+</div>
 
-        <div>
-            <label>OpenAI API Key</label>
-            <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
-            <div style="font-size:0.65rem; color:#64748b; margin-top:5px;">Key is saved to your browser cache.</div>
+<div class="modal-overlay" id="scriptModal" onclick="if(event.target===this) toggleScriptEditor()">
+    <div class="modal-content" style="width:700px;">
+        <div class="modal-header">
+            <div class="modal-title">✏️ SCRIPT EDITOR</div>
+            <button class="close-btn" onclick="toggleScriptEditor()">&times;</button>
         </div>
 
-        <div>
-            <label>Phonetic Dictionary (JSON)</label>
-            <textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()">
-{
-  "Nguyen": "Win",
-  "Gavrilos": "Gah-vree-los"
-}
-            </textarea>
+        <div class="template-tabs" style="margin-bottom:15px;">
+            <button class="tab-btn active" id="modalTab1" onclick="switchTab(1)">1. Heats</button>
+            <button class="tab-btn" id="modalTab2" onclick="switchTab(2)">2. Finalists</button>
+            <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
         </div>
 
-        <div>
-            <label style="color:var(--orange);">Raw Data (Debug)</label>
-            <textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-            <button class="btn-parse" onclick="manualParse(); toggleSettings();">Force Parse Data</button>
+        <textarea id="modalTemplateInput" style="height:200px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
+        
+        <div style="margin-top:10px;">
+            <label>Click to Insert Variable:</label>
+            <div class="var-chips">
+                <div class="var-chip" onclick="insertVar('{event}')">{event}</div>
+                <div class="var-chip" onclick="insertVar('{event_name}')">{event_name}</div>
+                <div class="var-chip" onclick="insertVar('{heat}')">{heat}</div>
+                <div class="var-chip" onclick="insertVar('{lane}')">{lane}</div>
+                <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
+                <div class="var-chip" onclick="insertVar('{name}')">{name}</div>
+                <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
+                <div class="var-chip" onclick="insertVar('{age}')">{age}</div>
+            </div>
         </div>
+
+        <button class="btn-gen" onclick="toggleScriptEditor()" style="margin-top:20px;">DONE</button>
     </div>
 </div>
 
@@ -288,6 +313,7 @@
     let audioCache = {}; 
     let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false;
+    let isScriptOpen = false;
 
     window.onload = () => {
         if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
@@ -298,26 +324,70 @@
     };
 
     function toggleSettings() {
-        const modal = document.getElementById('settingsModal');
-        modal.classList.toggle('active');
+        isSettingsOpen = !isSettingsOpen;
+        document.getElementById('viewMain').classList.toggle('active', !isSettingsOpen);
+        document.getElementById('viewSettings').classList.toggle('active', isSettingsOpen);
+        document.getElementById('sidebarTitle').innerText = isSettingsOpen ? "⚙️ SETTINGS" : "🏊 RUN SHOW";
+    }
+
+    // --- SCRIPT EDITOR LOGIC ---
+    function toggleScriptEditor() {
+        isScriptOpen = !isScriptOpen;
+        const modal = document.getElementById('scriptModal');
+        modal.classList.toggle('active', isScriptOpen);
+        
+        // Sync values
+        if(isScriptOpen) {
+            document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value;
+            document.getElementById('goBtnContainer').classList.add('disabled');
+        } else {
+            document.getElementById('goBtnContainer').classList.remove('disabled');
+        }
+    }
+
+    function syncScript() {
+        const val = document.getElementById('modalTemplateInput').value;
+        document.getElementById('templatePreview').value = val;
+        localStorage.setItem('t_'+currentTab, val);
+        markDirty();
+    }
+
+    function insertVar(text) {
+        const el = document.getElementById('modalTemplateInput');
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const val = el.value;
+        el.value = val.substring(0, start) + text + val.substring(end);
+        el.selectionStart = el.selectionEnd = start + text.length;
+        el.focus();
+        syncScript();
     }
 
     function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
     
-    // --- 3 TEMPLATE DEFAULTS ---
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.",
         3: "Finishing in lane {lane}, with a time of {time}, {name}."
     };
     let currentTab = 1;
+    
     function switchTab(t) { 
         currentTab=t; 
         loadTemplateUI(); 
         markDirty(); 
-        document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', i+1===t)); 
+        // Update both sidebars and modals
+        document.querySelectorAll('.tab-btn').forEach((b)=>b.classList.remove('active'));
+        document.getElementById('btnTab'+t).classList.add('active');
+        document.getElementById('modalTab'+t).classList.add('active');
     }
-    function loadTemplateUI() { document.getElementById('templateInput').value = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab]; }
+    
+    function loadTemplateUI() { 
+        const val = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
+        document.getElementById('templatePreview').value = val;
+        document.getElementById('modalTemplateInput').value = val;
+    }
+    
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
     function setStatus(msg, type) { const el = document.getElementById('statusText'); el.innerText = msg; el.className = 'status '+type; }
 
@@ -341,19 +411,13 @@
         return text;
     }
 
-    // --- UPLOAD HANDLER ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
         setStatus("Processing File...", "working");
-
-        if (file.type === "application/pdf") {
-            handlePdf(file);
-        } else if (file.type.startsWith("image/")) {
-            handleImage(file);
-        } else {
-            alert("Please upload a PDF or Image (JPG/PNG).");
-        }
+        if (file.type === "application/pdf") handlePdf(file);
+        else if (file.type.startsWith("image/")) handleImage(file);
+        else alert("Please upload a PDF or Image (JPG/PNG).");
     }
 
     async function handleImage(file) {
@@ -364,12 +428,8 @@
             await worker.terminate();
             document.getElementById('dataInput').value = ret.data.text;
             const count = manualParse(true);
-            if(count === 0) {
-                setStatus("OCR Failed to find swimmers. Check Settings -> Raw Data.", "error");
-                alert("I scanned the image but didn't see the usual swimmer format.");
-            } else {
-                setStatus(`Found ${count} swimmers from Image.`, "ready");
-            }
+            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed."); }
+            else setStatus(`Found ${count} swimmers.`, "ready");
         } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
     }
 
@@ -396,16 +456,11 @@
             }
             document.getElementById('dataInput').value = fullText;
             const count = manualParse(true); 
-            if(count === 0) {
-                setStatus("Auto-parse failed. Check Settings -> Raw Data.", "error");
-                alert("I couldn't find any swimmers.");
-            } else {
-                setStatus(`Found ${count} swimmers.`, "ready");
-            }
+            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
+            else setStatus(`Found ${count} swimmers.`, "ready");
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER (v19 Fixed Event Description) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -417,29 +472,19 @@
 
         for(let i=0; i<lines.length; i++) {
             let line = lines[i].trim();
-            
-            // 1. EVENT DETECTION
-            // Case A: "Event 101 Girls 50 Free..." (Single Line)
             const evtMatch = line.match(/Event\s+(\d+)\s+(.*)/i);
             if(evtMatch) {
                 currentEvent = evtMatch[1];
                 let rawEvtName = evtMatch[2].trim();
-                // CLEAN: Remove quotes, commas, dashes at start
                 rawEvtName = rawEvtName.replace(/^[-–—]\s*/, "").replace(/["',]/g, "");
                 if(rawEvtName.length > 3) currentEventName = rawEvtName;
-            } 
-            // Case B: "Event 101" (Description on next line)
-            else {
+            } else {
                 const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
                 if(shortEvt) {
                     currentEvent = shortEvt[1];
-                    // LOOK AHEAD
                     if (i + 1 < lines.length) {
                         let nextLine = lines[i+1].trim();
-                        // Ignore if next line is Heat/Lane
                         if (!nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
-                            // Strip starting quotes/commas from CSV
-                            // e.g. "","Girls 50 Yard..."
                             let cleanNext = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "");
                             if (cleanNext.length > 3) currentEventName = cleanNext;
                         }
@@ -447,12 +492,10 @@
                 }
             }
 
-            // 2. HEAT DETECTION
             const hMatch = line.match(/Heat\s+(\d+)/i);
             if(hMatch) currentHeat = hMatch[1];
             if(line.includes("Alternates")) currentHeat = null;
 
-            // 3. SWIMMER DETECTION
             if(currentHeat) {
                 const m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
                 if(m) {
@@ -474,27 +517,12 @@
 
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
                     const displayTitle = `Event ${currentEvent} - Heat ${currentHeat}`;
-                    
-                    parsedData.push({ 
-                        heatId: uniqueHeatId,
-                        heatTitle: displayTitle,
-                        event: currentEvent,
-                        eventName: currentEventName,
-                        heat: currentHeat,
-                        lane: m[1], 
-                        name: rawName, 
-                        age: m[3],
-                        team: rawTeam, 
-                        time: m[5].toUpperCase()
-                    });
+                    parsedData.push({ heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, heat: currentHeat, lane: m[1], name: rawName, age: m[3], team: rawTeam, time: m[5].toUpperCase() });
                 }
             }
         }
         
-        if (parsedData.length === 0 && !silent) {
-            alert("Parser found 0 swimmers. Ensure format matches layout.");
-            return 0;
-        }
+        if (parsedData.length === 0 && !silent) return 0;
 
         heats = {}; heatOrder = [];
         parsedData.forEach(s => {
@@ -595,7 +623,7 @@
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
         
-        const template = document.getElementById('templateInput').value;
+        const template = document.getElementById('modalTemplateInput').value; // Use modal val
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
@@ -706,7 +734,11 @@
         else setStatus("No Audio Generated.", "working");
     }
 
+    // --- KEYBOARD LISTENERS (SPACEBAR FIX) ---
     document.addEventListener('keydown', (e) => {
+        // IGNORE if typing in a text field
+        if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+
         if(!heats || Object.keys(heats).length === 0) return;
         if(e.code === 'Space') { e.preventDefault(); triggerGo(); } 
         else if(e.code === 'ArrowDown') navigate(1);
