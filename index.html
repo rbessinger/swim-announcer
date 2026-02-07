@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v48 (Photo Fix)</title>
+    <title>Swim Announcer Ultimate v44 (Stop Button + 4 Scripts)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V48 LAYOUT --- */
+        /* --- STABLE V44 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -265,7 +265,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v48.0 (Photo Fixed)</div>
+        <div class="version-tag">v44.0 (Stop + 4 Scripts)</div>
     </div>
 </div>
 
@@ -485,10 +485,388 @@
         return text;
     }
 
-    // --- FILE HANDLING (UPDATED FOR PHOTOS) ---
+    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
+        setStatus("Processing File...", "working");
+        const type = file.type.toLowerCase();
         
-        // HEIC Check
-        if (file.name.toLowerCase().endsWith('.heic') || file.type ===
+        if (type === "application/pdf") handlePdf(file);
+        else if (type.startsWith("image/")) handleImage(file);
+        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
+    }
+
+    async function handleImage(file) {
+        setStatus("Scanning Image (OCR)...", "working");
+        try {
+            const worker = await Tesseract.createWorker('eng');
+            const ret = await worker.recognize(file);
+            await worker.terminate();
+            document.getElementById('dataInput').value = ret.data.text;
+            const count = manualParse(true);
+            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed."); }
+            else setStatus(`Found ${count} swimmers.`, "ready");
+        } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
+    }
+
+    async function handlePdf(file) {
+        setStatus("Reading PDF...", "working");
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = "";
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
+                let lines = [], currentLine = [], lastY = items[0]?.y || 0;
+                items.forEach(d => {
+                    if (Math.abs(d.y - lastY) > 5) {
+                        lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+                        currentLine = []; lastY = d.y;
+                    }
+                    currentLine.push(d);
+                });
+                if(currentLine.length) lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
+                fullText += lines.join("\n") + "\n";
+            }
+            document.getElementById('dataInput').value = fullText;
+            const count = manualParse(true); 
+            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
+            else setStatus(`Found ${count} swimmers.`, "ready");
+        } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
+    }
+
+    // --- PARSER ---
+    function manualParse(silent = false) {
+        try {
+            const raw = document.getElementById('dataInput').value;
+            const nameFormat = document.getElementById('nameFormatSelect').value; 
+            const lines = raw.split('\n');
+            let parsedData = [];
+            let currentEvent = "Unknown";
+            let currentEventName = "";
+            let currentHeat = null;
+
+            for(let i=0; i<lines.length; i++) {
+                let line = lines[i].trim();
+                const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
+                if(evtMatch) {
+                    currentEvent = evtMatch[1];
+                    let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
+                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
+                } 
+                else {
+                    const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
+                    if(shortEvt) {
+                        currentEvent = shortEvt[1];
+                        for(let j=1; j<=2; j++) {
+                            if (i+j < lines.length) {
+                                let nextLine = lines[i+j].trim();
+                                if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
+                                    currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                const hMatch = line.match(/Heat\s+(\d+)/i);
+                if(hMatch) currentHeat = hMatch[1];
+                if(line.includes("Alternates")) currentHeat = null;
+
+                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                let mode = "heat";
+                if(!m) {
+                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
+                    mode = "result";
+                }
+
+                if(m && (currentHeat || mode === "result")) {
+                    let rawName = m[2].trim();
+                    let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+                    if (nameFormat === 'last_first' && rawName.includes(',')) {
+                        const parts = rawName.split(',');
+                        if(parts.length >= 2) {
+                            let last = parts[0].trim();
+                            let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
+                            rawName = `${first} ${last}`;
+                        }
+                    }
+                    if(mode === "result" && !currentHeat) currentHeat = "1";
+
+                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+                    const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
+                    
+                    parsedData.push({ 
+                        heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
+                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
+                        time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
+                    });
+                }
+            }
+            
+            if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
+
+            if (!heats || Object.keys(heats).length === 0 || confirm("Overwrite current list?")) {
+                heats = {}; heatOrder = [];
+                parsedData.forEach(s => {
+                    if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
+                    heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
+                });
+                heatOrder.sort(); 
+                saveSession();
+                renderBoard();
+            }
+            return parsedData.length;
+        } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
+    }
+
+    function renderBoard() {
+        const container = document.getElementById('listContainer');
+        container.innerHTML = "";
+        if (heatOrder.length === 0) { container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF or Image to begin.</p></div>`; return; }
+        
+        heatOrder.forEach(heatKey => {
+            const group = heats[heatKey];
+            const swimmers = group.swimmers;
+            swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
+
+            const heatBlock = document.createElement('div');
+            heatBlock.className = 'heat-block';
+            
+            let headerText = group.title;
+            const header = document.createElement('div');
+            header.className = 'heat-header';
+            header.innerHTML = `<div class="heat-title">${headerText}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
+            header.onclick = () => selectCue(heatKey, -1);
+            if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
+            heatBlock.appendChild(header);
+
+            swimmers.forEach((s, idx) => {
+                const row = document.createElement('div');
+                row.className = `swimmer-row ${s.scratched ? 'scratched' : ''}`;
+                if(currentSelection.heat === heatKey && currentSelection.index === idx) row.classList.add('active');
+                if(audioCache[s.id]) row.classList.add('has-audio');
+                
+                row.draggable = true;
+                row.ondragstart = (e) => dragStart(e, heatKey, idx);
+                row.ondragover = (e) => e.preventDefault(); 
+                row.ondrop = (e) => drop(e, heatKey, idx);
+
+                row.innerHTML = `<div class="col-lane">${s.lane}</div><div class="col-info"><div class="name-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'name', this)">${s.name}</div><div class="team-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'team', this)">${s.team}</div></div><div class="col-time">${s.time}</div><button class="btn-scratch ${s.scratched?'active':''}" onclick="toggleScratch('${heatKey}', ${idx})">X</button><div class="audio-dot"></div>`;
+                row.onclick = (e) => { if(!e.target.isContentEditable && e.target.tagName !== 'BUTTON') selectCue(heatKey, idx); };
+                heatBlock.appendChild(row);
+            });
+            
+            const addBtn = document.createElement('button');
+            addBtn.className = 'btn-add-swimmer';
+            addBtn.innerText = "+ Add Swimmer";
+            addBtn.onclick = () => addSwimmer(heatKey);
+            heatBlock.appendChild(addBtn);
+
+            container.appendChild(heatBlock);
+        });
+    }
+
+    function addSwimmer(heatKey) {
+        const s = { heatId: heatKey, event: "?", heat: "?", lane: "9", name: "New Swimmer", team: "Team", time: "NT", scratched: false, id: `s_${heatKey}_${Date.now()}` };
+        heats[heatKey].swimmers.push(s); saveSession(); renderBoard();
+    }
+
+    let dragSrc = null;
+    function dragStart(e, heat, index) { dragSrc = { heat, index }; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+    function drop(e, targetHeat, targetIndex) {
+        e.preventDefault();
+        if(!dragSrc) return;
+        const srcList = heats[dragSrc.heat].swimmers;
+        const swimmer = srcList[dragSrc.index];
+        srcList.splice(dragSrc.index, 1);
+        const targetList = heats[targetHeat].swimmers;
+        swimmer.lane = targetList[targetIndex]?.lane || swimmer.lane; 
+        targetList.splice(targetIndex, 0, swimmer);
+        if(srcList.length === 0) delete heats[dragSrc.heat];
+        dragSrc = null; saveSession(); renderBoard();
+    }
+
+    function updateData(heat, idx, field, el) { heats[heat].swimmers[idx][field] = el.innerText; saveSession(); markDirty(); }
+    function toggleScratch(heat, idx) { heats[heat].swimmers[idx].scratched = !heats[heat].swimmers[idx].scratched; saveSession(); renderBoard(); }
+    function selectCue(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); }
+
+    function toggleScriptEditor() {
+        isScriptOpen = !isScriptOpen;
+        const modal = document.getElementById('scriptModal');
+        modal.classList.toggle('active', isScriptOpen);
+        if(isScriptOpen) { document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value; document.getElementById('goBtnContainer').classList.add('disabled'); }
+        else { document.getElementById('goBtnContainer').classList.remove('disabled'); }
+    }
+
+    function syncScript() {
+        const bodyVal = document.getElementById('modalTemplateInput').value;
+        const introVal = document.getElementById('introScriptInput').value;
+        document.getElementById('templatePreview').value = bodyVal;
+        localStorage.setItem('t_'+currentTab, bodyVal);
+        localStorage.setItem('intro_'+currentTab, introVal);
+        markDirty();
+    }
+
+    function insertVar(text) {
+        let el = document.activeElement;
+        if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
+        const start = el.selectionStart; const end = el.selectionEnd; const val = el.value;
+        el.value = val.substring(0, start) + text + val.substring(end);
+        el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
+    }
+
+    function getOrdinal(n) {
+        let s = ["th", "st", "nd", "rd"]; let v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+
+    async function generateAudio() {
+        const engine = document.getElementById('engineSelect').value;
+        const oaKey = cleanInput(document.getElementById('apiKey').value);
+        const xiKey = cleanInput(document.getElementById('elevenKey').value);
+        
+        // Custom Voice ID Logic
+        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
+
+        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+
+        const btn = document.getElementById('btnGenerate');
+        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+        const template = document.getElementById('modalTemplateInput').value; 
+        const introTemplate = document.getElementById('introScriptInput').value;
+        const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
+        const voice = document.getElementById('voiceSelect').value;
+        const forceRegen = document.getElementById('forceRegen').checked;
+        const queue = [];
+        
+        for (const heatKey of heatOrder) {
+            const group = heats[heatKey];
+            const hId = `h_${heatKey}`;
+            
+            if (forceRegen || !audioCache[hId]) {
+                let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                introText = applyHype(introText);
+                queue.push({ id: hId, text: introText });
+            }
+            for (const s of group.swimmers) {
+                if(s.scratched) continue;
+                if (forceRegen || !audioCache[s.id]) {
+                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                    let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+                    txt = applyHype(txt);
+                    queue.push({ id: s.id, text: txt });
+                }
+            }
+        }
+
+        const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+        
+        let completed = 0; const total = queue.length;
+        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
+        setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
+
+        async function worker() {
+            while (queue.length > 0) {
+                const task = queue.shift();
+                try {
+                    let res = null;
+                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                    else res = await fetchOpenAI(task.text, voice, oaKey);
+                    
+                    if(res) audioCache[task.id] = res;
+                } catch(e) { 
+                    console.error(e); 
+                    alert(`API Error: ${e.message}`);
+                }
+                completed++;
+                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+            }
+        }
+        const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+        await Promise.all(workers);
+        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
+    }
+
+    async function fetchOpenAI(text, voice, key) {
+        const speed = parseFloat(document.getElementById('speedSlider')?.value || 1.0);
+        const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: speed }) });
+        if(!r.ok) throw new Error(`OpenAI ${r.status}`);
+        return new Audio(URL.createObjectURL(await r.blob()));
+    }
+
+    async function fetchEleven(text, voiceId, key) {
+        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+            method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                text: text, 
+                model_id: "eleven_turbo_v2", 
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 } 
+            })
+        });
+        if(!r.ok) {
+            if(r.status === 401) throw new Error("ElevenLabs 401: Invalid Key.");
+            if(r.status === 429) throw new Error("ElevenLabs 429: Rate Limit. Wait a moment.");
+            throw new Error(`ElevenLabs ${r.status}`);
+        }
+        return new Audio(URL.createObjectURL(await r.blob()));
+    }
+
+    // --- STOP PLAYBACK ---
+    function stopPlayback() {
+        if(currentAudioObject) {
+            currentAudioObject.pause();
+            currentAudioObject.currentTime = 0;
+            currentAudioObject = null;
+            setStatus("Playback Stopped.", "stopped");
+        }
+    }
+
+    function triggerGo() {
+        const { heat, index } = currentSelection;
+        if(heat === null) { if(heatOrder.length > 0) selectCue(heatOrder[0], -1); else return; }
+        playSelection(); navigate(1);
+    }
+
+    function playSelection() {
+        stopPlayback(); // Auto-stop previous
+        const { heat, index } = currentSelection;
+        let aud = null; let msg = "";
+        if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
+        else { const s = heats[heat].swimmers[index]; if(!s.scratched) { aud = audioCache[s.id]; msg = `Announcing Lane ${s.lane}...`; } else { msg = "Skipping Scratched..."; } }
+        
+        if(aud) { 
+            currentAudioObject = aud;
+            aud.currentTime=0; 
+            aud.play(); 
+            setStatus(msg, "working"); 
+        } else setStatus("No Audio Generated.", "working");
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+        if(!heats || Object.keys(heats).length === 0) return;
+        if(e.code === 'Space') { e.preventDefault(); triggerGo(); } 
+        else if(e.code === 'Escape') { e.preventDefault(); stopPlayback(); }
+        else if(e.code === 'ArrowDown') navigate(1); else if(e.code === 'ArrowUp') navigate(-1);
+    });
+
+    function navigate(dir) {
+        let flatMap = [];
+        heatOrder.forEach(h => { flatMap.push({ heat: h, index: -1 }); heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); }); });
+        let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
+        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
+        if(currIdx >= 0 && currIdx < flatMap.length) { currentSelection = flatMap[currIdx]; renderBoard(); const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'}); }
+    }
+</script>
+</body>
+</html>
