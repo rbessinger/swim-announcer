@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v38 (Sanitized)</title>
+    <title>Swim Announcer Ultimate v39 (Google Added)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -176,6 +176,7 @@
             <div>
                 <label>3. Voice Engine</label>
                 <select id="engineSelect" onchange="updateVoiceOptions()" style="margin-bottom:10px;">
+                    <option value="google">Google Cloud (New)</option>
                     <option value="openai">OpenAI</option>
                     <option value="elevenlabs">ElevenLabs</option>
                 </select>
@@ -198,6 +199,7 @@
         </div>
 
         <div id="viewSettings" class="view-section">
+            <div><label style="color:var(--green);">Google Cloud API Key</label><input type="password" id="googleKey" placeholder="AIza..." onchange="saveConfig()"></div>
             <div><label>OpenAI API Key</label><input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()"></div>
             <div><label>ElevenLabs API Key</label><input type="password" id="elevenKey" placeholder="xi-..." onchange="saveConfig()"></div>
             <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea></div>
@@ -242,11 +244,12 @@
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) toggleSettings()">
     <div class="modal-content">
         <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
+        <div><label style="color:var(--green);">Google Cloud API Key</label><input type="password" id="googleKeyModal" placeholder="AIza..." onchange="saveConfigFromModal()"></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v38.0 (Sanitized Keys)</div>
+        <div class="version-tag">v39.0 (Google Added)</div>
     </div>
 </div>
 
@@ -289,10 +292,9 @@
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
 
-    // --- CLEAN KEY INPUT (V38 FIX) ---
+    // --- CLEAN KEY INPUT ---
     function cleanInput(str) {
         if (!str) return "";
-        // Remove zero-width spaces, newlines, tabs, and non-ascii junk
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     }
 
@@ -306,10 +308,14 @@
             document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
             document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
         }
+        if(localStorage.getItem('google_key')) {
+            document.getElementById('googleKey').value = localStorage.getItem('google_key');
+            document.getElementById('googleKeyModal').value = localStorage.getItem('google_key');
+        }
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
         // Init Engine
-        const savedEngine = localStorage.getItem('engine_pref') || 'openai';
+        const savedEngine = localStorage.getItem('engine_pref') || 'google';
         document.getElementById('engineSelect').value = savedEngine;
         updateVoiceOptions();
 
@@ -337,6 +343,13 @@
         {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
         {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
     ];
+    // Google Journey voices are Expressive (Gemini-like)
+    const VOICES_GOOGLE = [
+        {id:'en-US-Journey-D', name:'Journey D (Deep/Expressive)'},
+        {id:'en-US-Journey-F', name:'Journey F (Warm/Expressive)'},
+        {id:'en-US-Studio-M', name:'Studio M (Pro Announcer)'},
+        {id:'en-US-Studio-Q', name:'Studio Q (News Anchor)'}
+    ];
 
     function updateVoiceOptions() {
         const engine = document.getElementById('engineSelect').value;
@@ -347,7 +360,10 @@
         // Show Custom Voice Field if ElevenLabs
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
 
-        const list = engine === 'elevenlabs' ? VOICES_ELEVEN : VOICES_OPENAI;
+        let list = VOICES_GOOGLE;
+        if(engine === 'openai') list = VOICES_OPENAI;
+        if(engine === 'elevenlabs') list = VOICES_ELEVEN;
+
         list.forEach(v => {
             const opt = document.createElement('option');
             opt.value = v.id;
@@ -392,16 +408,20 @@
     function saveConfig() { 
         localStorage.setItem('openai_key', cleanInput(document.getElementById('apiKey').value)); 
         localStorage.setItem('eleven_key', cleanInput(document.getElementById('elevenKey').value)); 
+        localStorage.setItem('google_key', cleanInput(document.getElementById('googleKey').value)); 
         localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
         localStorage.setItem('custom_voice_id', cleanInput(document.getElementById('customVoiceId').value));
     }
     function saveConfigFromModal() { 
         const oa = cleanInput(document.getElementById('apiKeyModal').value);
         const xi = cleanInput(document.getElementById('elevenKeyModal').value);
+        const go = cleanInput(document.getElementById('googleKeyModal').value);
         document.getElementById('apiKey').value = oa; 
         document.getElementById('elevenKey').value = xi;
+        document.getElementById('googleKey').value = go;
         localStorage.setItem('openai_key', oa);
         localStorage.setItem('eleven_key', xi);
+        localStorage.setItem('google_key', go);
     }
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
@@ -693,6 +713,7 @@
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
+        const goKey = cleanInput(document.getElementById('googleKey').value);
         
         // Custom Voice ID Logic
         const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
@@ -700,6 +721,7 @@
 
         if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
         if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+        if (engine === 'google' && !goKey) { alert("Missing Google Cloud Key. Check Settings."); toggleSettings(); return; }
 
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
@@ -742,7 +764,8 @@
                 try {
                     let res = null;
                     if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                    else res = await fetchOpenAI(task.text, voice, oaKey);
+                    else if(engine === 'openai') res = await fetchOpenAI(task.text, voice, oaKey);
+                    else if(engine === 'google') res = await fetchGoogle(task.text, voiceId, goKey);
                     
                     if(res) audioCache[task.id] = res;
                 } catch(e) { 
@@ -771,6 +794,26 @@
         });
         if(!r.ok) throw new Error(`ElevenLabs ${r.status}`);
         return new Audio(URL.createObjectURL(await r.blob()));
+    }
+    
+    // --- GOOGLE FETCH (REST API) ---
+    async function fetchGoogle(text, voiceId, key) {
+        const r = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${key}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                input: { text: text },
+                voice: { languageCode: "en-US", name: voiceId },
+                audioConfig: { audioEncoding: "MP3" }
+            })
+        });
+        if(!r.ok) {
+            const err = await r.json();
+            throw new Error(`Google Error: ${err.error.message}`);
+        }
+        const data = await r.json();
+        // Google returns base64 string
+        return new Audio(`data:audio/mp3;base64,${data.audioContent}`);
     }
 
     function triggerGo() {
