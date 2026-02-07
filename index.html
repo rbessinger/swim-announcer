@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v35 (ElevenLabs + OpenAI)</title>
+    <title>Swim Announcer Ultimate v36 (Engine Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V20 LAYOUT ENGINE --- */
+        /* --- STABLE V20 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -141,7 +141,6 @@
     </div>
     
     <div class="scroll-area">
-        
         <div id="viewMain" class="view-section active">
             <div>
                 <label>1. Upload Meet Program</label>
@@ -205,7 +204,7 @@
             <input type="checkbox" id="forceRegen">
             <span>Force Re-Gen</span>
         </label>
-        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO (TURBO)</span></button>
+        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO</span></button>
         <button class="btn-reset" onclick="clearSession()">🗑️ CLEAR / NEW MEET</button>
         <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
     </div>
@@ -239,9 +238,9 @@
         <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
-        <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
-        <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v35.0 (Dual Engine)</div>
+        <div><label>Phonetic Dictionary</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
+        <div><label style="color:var(--orange);">Raw Data</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse</button></div>
+        <div class="version-tag">v36.0 (Multi-Engine Fixed)</div>
     </div>
 </div>
 
@@ -279,13 +278,13 @@
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
 
-    // --- PHONETIC MEGA PACK (Pre-Loaded) ---
+    // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
 
     window.onload = () => {
-        // Init API Keys
+        // Init Keys
         if(localStorage.getItem('openai_key')) {
             document.getElementById('apiKey').value = localStorage.getItem('openai_key');
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
@@ -295,18 +294,18 @@
             document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
         }
         
-        // Init Engine Select
+        // Init Engine
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
         document.getElementById('engineSelect').value = savedEngine;
         updateVoiceOptions();
 
-        // Init Dictionary
+        // Init Dict
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
-        // Load Session
+        // Init Session
         if(localStorage.getItem('saved_heats')) loadSession();
         else loadTemplateUI();
         
@@ -314,21 +313,15 @@
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
-    // --- VOICE OPTIONS (OPENAI vs ELEVENLABS) ---
+    // --- VOICE OPTIONS ---
     const VOICES_OPENAI = [
-        {id:'nova', name:'Nova (Energetic)'},
-        {id:'onyx', name:'Onyx (Announcer)'},
-        {id:'alloy', name:'Alloy (Balanced)'},
-        {id:'echo', name:'Echo (Soft)'},
-        {id:'shimmer', name:'Shimmer (Clear)'}
+        {id:'nova', name:'Nova (Energetic)'}, {id:'onyx', name:'Onyx (Announcer)'}, {id:'alloy', name:'Alloy (Balanced)'}, {id:'echo', name:'Echo (Soft)'}, {id:'shimmer', name:'Shimmer (Clear)'}
     ];
-    // Specific High-Quality ElevenLabs Voices (IDs are public/popular)
     const VOICES_ELEVEN = [
         {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
         {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
         {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
-        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'},
-        {id:'cgSgspJ2msm6clMCkdW9', name:'Jessica (News)'}
+        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
     ];
 
     function updateVoiceOptions() {
@@ -344,41 +337,31 @@
             select.appendChild(opt);
         });
         
-        // Restore saved voice preference if possible
         const savedVoice = localStorage.getItem('voice_id_pref');
         if(savedVoice) {
-            // Check if saved voice exists in current list
             const exists = list.find(v => v.id === savedVoice);
             if(exists) select.value = savedVoice;
         }
-        
         localStorage.setItem('engine_pref', engine);
     }
 
-    // --- SESSION MANAGEMENT ---
+    // --- SESSION ---
     function saveSession() {
         localStorage.setItem('saved_heats', JSON.stringify(heats));
         localStorage.setItem('saved_order', JSON.stringify(heatOrder));
         setStatus("Session Saved.", "ready");
     }
-
     function loadSession() {
         try {
             heats = JSON.parse(localStorage.getItem('saved_heats'));
             heatOrder = JSON.parse(localStorage.getItem('saved_order'));
-            if(heats && heatOrder) {
-                renderBoard();
-                setStatus("Restored previous session.", "ready");
-            }
-        } catch(e) { console.error("Load failed", e); }
+            if(heats && heatOrder) { renderBoard(); setStatus("Restored previous session.", "ready"); }
+        } catch(e) { console.error(e); }
         loadTemplateUI();
     }
-
     function clearSession() {
         if(confirm("Are you sure? This will delete all current heats.")) {
-            localStorage.removeItem('saved_heats');
-            localStorage.removeItem('saved_order');
-            location.reload();
+            localStorage.removeItem('saved_heats'); localStorage.removeItem('saved_order'); location.reload();
         }
     }
 
@@ -394,12 +377,12 @@
         localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
     }
     function saveConfigFromModal() { 
-        const oaKey = document.getElementById('apiKeyModal').value; 
-        const xiKey = document.getElementById('elevenKeyModal').value;
-        document.getElementById('apiKey').value = oaKey; 
-        document.getElementById('elevenKey').value = xiKey;
-        localStorage.setItem('openai_key', oaKey);
-        localStorage.setItem('eleven_key', xiKey);
+        const oa = document.getElementById('apiKeyModal').value;
+        const xi = document.getElementById('elevenKeyModal').value;
+        document.getElementById('apiKey').value = oa; 
+        document.getElementById('elevenKey').value = xi;
+        localStorage.setItem('openai_key', oa);
+        localStorage.setItem('eleven_key', xi);
     }
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
@@ -513,6 +496,8 @@
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
+                
+                // Event Detection
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
@@ -535,10 +520,12 @@
                     }
                 }
 
+                // Heat Detection
                 const hMatch = line.match(/Heat\s+(\d+)/i);
                 if(hMatch) currentHeat = hMatch[1];
                 if(line.includes("Alternates")) currentHeat = null;
 
+                // Swimmer Detection
                 let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
                 let mode = "heat";
                 if(!m) {
