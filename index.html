@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v58 (Anti-Freeze)</title>
+    <title>Swim Announcer Ultimate v59 (Data Sanitizer)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -39,12 +39,7 @@
         .file-icon { font-size: 1.5rem; }
         input[type="file"] { display: none; }
 
-        /* DEBUG CONSOLE */
-        .debug-console { 
-            background: #000; color: #00ff00; font-family: monospace; font-size: 0.7rem; 
-            padding: 10px; border-radius: 6px; height: 100px; overflow-y: auto; 
-            border: 1px solid #333; margin-bottom: 10px; display: none;
-        }
+        .debug-console { background: #000; color: #00ff00; font-family: monospace; font-size: 0.7rem; padding: 10px; border-radius: 6px; height: 100px; overflow-y: auto; border: 1px solid #333; margin-bottom: 10px; display: none; }
         .debug-console.active { display: block; }
 
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
@@ -68,13 +63,15 @@
         .checkbox-row input { width: auto; accent-color: var(--accent); cursor: pointer; }
         .checkbox-row span { font-size: 0.8rem; color: #cbd5e1; }
 
-        /* LOADING OVERLAY */
-        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; flex-direction: column; justify-content: center; align-items: center; color: white; }
-        .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
+        .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
         .ai-toggle-box { background: #1e1b4b; border: 1px solid #4f46e5; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .ai-badge { background: linear-gradient(90deg, #4f46e5, #ec4899); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; margin-left: 5px; }
+
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 1000; flex-shrink: 0; }
@@ -309,7 +306,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v58.0 (Anti-Freeze)</div>
+        <div class="version-tag">v59.0 (Sanitizer Added)</div>
     </div>
 </div>
 
@@ -350,7 +347,7 @@
     let currentAudioObject = null;
     let viewMode = 'heats'; 
     let progressInterval;
-    let loadTimeout; // Safety timer
+    let loadTimeout;
 
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
@@ -379,13 +376,12 @@
         document.getElementById('loadingOverlay').style.display = 'flex';
         document.getElementById('loadingText').innerText = text;
         
-        // Safety Timeout (15 seconds)
         clearTimeout(loadTimeout);
         loadTimeout = setTimeout(() => {
             hideLoading();
             alert("Error: Operation timed out. Check file or network.");
             log("Error: Timeout triggered.");
-        }, 15000);
+        }, 45000); // 45s Timeout
     }
     
     function hideLoading() {
@@ -636,10 +632,13 @@
             const ret = await worker.recognize(cleanDataUrl);
             await worker.terminate();
             
-            document.getElementById('dataInput').value = ret.data.text;
+            // CLEAN INPUT (Strip Quotes)
+            const cleanText = ret.data.text.replace(/"/g, '').replace(/,/g, ' ');
+            document.getElementById('dataInput').value = cleanText;
+            
             log("Text extracted. Starting Stream Parse...");
             
-            if(document.getElementById('useAiParser').checked) await parseWithAI(ret.data.text);
+            if(document.getElementById('useAiParser').checked) await parseWithAI(cleanText);
             else streamParse(); 
 
         } catch(e) { 
@@ -659,12 +658,15 @@
             let fullText = "";
             
             for (let i = 1; i <= pdf.numPages; i++) {
+                // UPDATE STATUS
+                setStatus(`Reading PDF Page ${i} of ${pdf.numPages}...`, "working");
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
                 const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
+                
                 let lines = [], currentLine = [], lastY = items[0]?.y || 0;
                 items.forEach(d => {
-                    if (Math.abs(d.y - lastY) > 5) {
+                    if (Math.abs(d.y - lastY) > 10) { 
                         lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
                         currentLine = []; lastY = d.y;
                     }
@@ -681,11 +683,14 @@
                 return;
             }
 
-            document.getElementById('dataInput').value = fullText;
+            // CLEAN INPUT (Strip Quotes)
+            const cleanText = fullText.replace(/"/g, '').replace(/,/g, ' ');
+            document.getElementById('dataInput').value = cleanText;
+            
             log(`Extracted ${fullText.length} characters.`);
             log("Starting Stream Parse...");
             
-            if(document.getElementById('useAiParser').checked) await parseWithAI(fullText);
+            if(document.getElementById('useAiParser').checked) await parseWithAI(cleanText);
             else streamParse();
 
         } catch(e) { 
@@ -695,7 +700,7 @@
         }
     }
 
-    // --- STREAM PARSER (V58 - Multi-Line Headers) ---
+    // --- STREAM PARSER (V59 - Sanitized) ---
     function streamParse() {
         try {
             const raw = document.getElementById('dataInput').value;
@@ -711,7 +716,6 @@
                 let line = lines[i].trim();
                 if(line.length < 1) continue;
 
-                // 1. EVENT DETECTION
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
@@ -722,10 +726,7 @@
                     continue;
                 }
 
-                // 2. HEAT DETECTION (MULTI-LINE)
                 let hMatch = line.match(/Heat\s+(\d+)/i);
-                
-                // Case: "Heat" is one line, "2 of 4" is next line
                 if (line.toLowerCase() === "heat" && i+1 < lines.length) {
                     const nextLine = lines[i+1].trim();
                     const multiMatch = nextLine.match(/^(\d+)\s+of/i);
@@ -738,7 +739,6 @@
                     continue;
                 }
 
-                // 3. SWIMMER FRAGMENT COLLECTOR
                 if(line.match(/^\d{1,2}$/)) { pendingLane = line; continue; }
                 if(pendingLane && !pendingName && line.match(/^[A-Za-z \.-]+$/)) { pendingName = line; continue; }
 
@@ -767,7 +767,6 @@
                     }
                 }
 
-                // 4. STANDARD LINE PARSER
                 let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+)($|\s)/);
                 if(m) {
                     if(!currentHeat) currentHeat = "1";
@@ -808,7 +807,6 @@
         }
     }
 
-    // --- AI PARSING ENGINE ---
     async function parseWithAI(rawText) {
         const key = cleanInput(document.getElementById('apiKey').value);
         if(!key.startsWith('sk-')) { alert("AI Parser requires a valid OpenAI API Key."); return; }
