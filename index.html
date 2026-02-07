@@ -2,18 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v26 (Restored)</title>
+    <title>Swim Announcer Ultimate v27 (Stabilized)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
-        /* --- V20 CSS BASE (STABLE LAYOUT) --- */
+        /* --- STABLE V20 STYLING --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* SIDEBAR */
         .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
@@ -120,7 +119,7 @@
         }
         .modal-overlay.active { display: flex; }
         .modal-content { 
-            background: #0f172a; width: 700px; padding: 30px; border-radius: 12px; 
+            background: #0f172a; width: 600px; padding: 30px; border-radius: 12px; 
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; 
             color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative;
         }
@@ -268,12 +267,12 @@
             <button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button>
         </div>
         
-        <div class="version-tag">v26.0 (Restored)</div>
+        <div class="version-tag">v27.0 (Restored Stable)</div>
     </div>
 </div>
 
 <div class="modal-overlay" id="scriptModal" onclick="if(event.target===this) toggleScriptEditor()">
-    <div class="modal-content">
+    <div class="modal-content" style="width:700px;">
         <div class="modal-header">
             <div class="modal-title">✏️ SCRIPT EDITOR</div>
             <button class="close-btn" onclick="toggleScriptEditor()">&times;</button>
@@ -324,10 +323,12 @@
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
         }
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
+        
         if(localStorage.getItem('phonetic_dict')) {
             document.getElementById('dictInput').value = localStorage.getItem('phonetic_dict');
             document.getElementById('dictInputModal').value = localStorage.getItem('phonetic_dict');
         }
+
         loadTemplateUI();
         updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
@@ -403,6 +404,7 @@
         const file = input.files[0];
         setStatus("Processing File...", "working");
         const type = file.type.toLowerCase();
+        
         if (type === "application/pdf") handlePdf(file);
         else if (type.includes("heic")) handleHeic(file);
         else if (type.startsWith("image/")) handleImage(file);
@@ -412,8 +414,13 @@
     async function handleHeic(file) {
         setStatus("Converting HEIC...", "working");
         try {
-            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
-            handleImage(blob);
+            if(window.heic2any) {
+                const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
+                handleImage(blob);
+            } else {
+                alert("HEIC Converter library failed to load. Please use JPG/PNG.");
+                setStatus("Library Error.", "error");
+            }
         } catch(e) { console.error(e); setStatus("HEIC Conversion Failed.", "error"); }
     }
 
@@ -458,7 +465,7 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- ROBUST PARSER (V26) ---
+    // --- STABLE PARSER LOGIC (V27) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -472,25 +479,25 @@
             let line = lines[i].trim();
             
             // 1. EVENT DETECTION
-            // Case A: "Event 101 Girls 50 Free..." (Single Line)
+            // A: "Event 5 Girls..." (Same line)
             const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
             if(evtMatch) {
                 currentEvent = evtMatch[1];
                 let rawName = evtMatch[2];
                 rawName = rawName.replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-                // Filter out headers
+                // Filter out common header words
                 if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) {
                     currentEventName = rawName;
                 }
             } 
+            // B: "Event 101" (Split line)
             else {
-                // Case B: Split Line Check
                 const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
                 if(shortEvt) {
                     currentEvent = shortEvt[1];
-                    // Peek ahead 1-2 lines for description
+                    // Peek ahead 1-2 lines
                     for(let j=1; j<=2; j++) {
-                        if (i + j < lines.length) {
+                        if (i+j < lines.length) {
                             let nextLine = lines[i+j].trim();
                             if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
                                 currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
@@ -506,13 +513,12 @@
             if(hMatch) currentHeat = hMatch[1];
             if(line.includes("Alternates")) currentHeat = null;
 
-            // 3. SWIMMER DETECTION
-            // Standard Heat Sheet (Lane Name ... Time)
+            // 3. ROW DETECTION
+            // Heat Sheet (Lane First)
             let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
             let mode = "heat";
             
-            // If fail, check for Results Format (Rank Name ... Time)
-            // e.g. "1 Ma, Annie ... 2:49.93"
+            // Results Sheet (Rank First, Time Last)
             if(!m) {
                 m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
                 mode = "result";
@@ -827,10 +833,7 @@
             heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
         });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
-        
-        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; 
-        else currIdx += dir;
-        
+        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
         if(currIdx >= 0 && currIdx < flatMap.length) {
             currentSelection = flatMap[currIdx]; renderBoard();
             const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
