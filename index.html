@@ -2,19 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v31 (Restored)</title>
+    <title>Swim Announcer Ultimate v29 (Polished)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
-        /* --- STABLE FLEXBOX LAYOUT (Based on v28) --- */
+        /* --- STABLE V20 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
         /* SIDEBAR */
-        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 100; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
@@ -117,7 +118,7 @@
         /* MODALS */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; }
-        .modal-content { background: #0f172a; width: 700px; padding: 30px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative; }
+        .modal-content { background: #0f172a; width: 600px; padding: 30px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
         .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
@@ -144,8 +145,8 @@
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">Drag PDF or Image (JPG/PNG)</div>
-                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
+                    <div class="file-upload-text">Drag PDF or Image (HEIC/JPG)</div>
+                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg,.heic" onchange="handleFileUpload(this)">
                 </label>
             </div>
 
@@ -190,7 +191,7 @@
 
         <div id="viewSettings" class="view-section">
             <div><label>OpenAI API Key</label><input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()"></div>
-            <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea></div>
+            <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()">{"Nguyen":"Win"}</textarea></div>
             <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea></div>
         </div>
     </div>
@@ -212,37 +213,26 @@
 
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) toggleSettings()">
     <div class="modal-content">
-        <div class="modal-header">
-            <div class="modal-title">⚙️ SETTINGS</div>
-            <button class="close-btn" onclick="toggleSettings()">&times;</button>
-        </div>
-        
+        <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
-        <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
+        <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:100px; font-size:0.75rem;" onchange="saveDictFromModal()">{"Nguyen":"Win"}</textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v31.0 (Restored Core)</div>
+        <div class="version-tag">v29.0 (Polish)</div>
     </div>
 </div>
 
 <div class="modal-overlay" id="scriptModal" onclick="if(event.target===this) toggleScriptEditor()">
     <div class="modal-content" style="width:700px;">
-        <div class="modal-header">
-            <div class="modal-title">✏️ SCRIPT EDITOR</div>
-            <button class="close-btn" onclick="toggleScriptEditor()">&times;</button>
-        </div>
-
+        <div class="modal-header"><div class="modal-title">✏️ SCRIPT EDITOR</div><button class="close-btn" onclick="toggleScriptEditor()">&times;</button></div>
         <div class="template-tabs" style="margin-bottom:15px;">
             <button class="tab-btn active" id="modalTab1" onclick="switchTab(1)">1. Heats</button>
             <button class="tab-btn" id="modalTab2" onclick="switchTab(2)">2. Finalists</button>
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
         </div>
-
         <label>EVENT INTRO SCRIPT</label>
-        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
-
+        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()"></textarea>
         <label>SWIMMER SCRIPT</label>
         <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
-        
         <div style="margin-top:10px;">
             <label>Click to Insert Variable:</label>
             <div class="var-chips">
@@ -257,7 +247,6 @@
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
             </div>
         </div>
-
         <button class="btn-gen" onclick="toggleScriptEditor()" style="margin-top:20px;">DONE</button>
     </div>
 </div>
@@ -266,24 +255,11 @@
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
 
-    const MEGA_DICT = {
-        "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
-    };
-
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
-            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
-        }
+        if(localStorage.getItem('openai_key')) { document.getElementById('apiKey').value = localStorage.getItem('openai_key'); document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key'); }
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
-        
-        let savedDict = localStorage.getItem('phonetic_dict');
-        if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
-        document.getElementById('dictInput').value = savedDict;
-        document.getElementById('dictInputModal').value = savedDict;
-
-        loadTemplateUI();
-        updateSliders();
+        if(localStorage.getItem('phonetic_dict')) { document.getElementById('dictInput').value = localStorage.getItem('phonetic_dict'); document.getElementById('dictInputModal').value = localStorage.getItem('phonetic_dict'); }
+        loadTemplateUI(); updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
@@ -341,15 +317,24 @@
         return text;
     }
 
+    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
         setStatus("Processing File...", "working");
         const type = file.type.toLowerCase();
-        
         if (type === "application/pdf") handlePdf(file);
+        else if (type.includes("heic")) handleHeic(file);
         else if (type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
+        else alert("Please upload PDF, JPG, PNG, or HEIC.");
+    }
+
+    async function handleHeic(file) {
+        setStatus("Converting HEIC...", "working");
+        try {
+            if(window.heic2any) { const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 }); handleImage(blob); }
+            else { alert("HEIC lib failed. Use JPG."); setStatus("Library Error.", "error"); }
+        } catch(e) { console.error(e); setStatus("HEIC Error.", "error"); }
     }
 
     async function handleImage(file) {
@@ -393,6 +378,7 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
+    // --- ROBUST PARSER (V29) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -454,7 +440,7 @@
                 if(mode === "result" && !currentHeat) currentHeat = "1";
 
                 const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
+                const displayTitle = `Event ${currentEvent} - ${currentEventName} - ${mode==="result"?"Results":"Heat "+currentHeat}`;
                 
                 parsedData.push({ 
                     heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
@@ -559,6 +545,7 @@
         el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
     }
 
+    // --- ORDINAL HELPER (1st, 2nd, 3rd) ---
     function getOrdinal(n) {
         let s = ["th", "st", "nd", "rd"];
         let v = n % 100;
@@ -582,7 +569,7 @@
             const hId = `h_${heatKey}`;
             if (forceRegen || !audioCache[hId]) {
                 let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName);
                 introText = applyHype(introText);
                 queue.push({ id: hId, text: introText });
             }
@@ -590,7 +577,9 @@
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
                     let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                    // Apply Ordinal Place (1 -> 1st)
                     let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+
                     let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
                     for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
                     txt = applyHype(txt);
