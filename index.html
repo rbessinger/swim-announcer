@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v29 (Polished)</title>
+    <title>Swim Announcer Ultimate v28 (Gold Standard)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
-        /* --- STABLE V20 LAYOUT --- */
+        /* --- V20 STABLE LAYOUT ENGINE --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -63,7 +63,7 @@
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
-        /* MAIN DASHBOARD */
+        /* MAIN DASHBOARD (V20 Fixed) */
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 10; flex-shrink: 0; }
         
@@ -72,7 +72,7 @@
         .status.working { color: var(--accent); }
         .status.error { color: var(--red); }
 
-        .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; padding-bottom: 140px; }
+        .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; padding-bottom: 140px; /* Space for GO button */ }
         
         .heat-block { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e2e8f0; overflow: hidden; }
         .heat-header { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
@@ -139,13 +139,12 @@
     </div>
     
     <div class="scroll-area">
-        
         <div id="viewMain" class="view-section active">
             <div>
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">Drag PDF or Image (HEIC/JPG)</div>
+                    <div class="file-upload-text">Drag PDF or Image here</div>
                     <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg,.heic" onchange="handleFileUpload(this)">
                 </label>
             </div>
@@ -201,13 +200,31 @@
             <input type="checkbox" id="forceRegen">
             <span>Force Re-Gen</span>
         </label>
-        
-        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
-            <span>⚡ GENERATE AUDIO (TURBO)</span>
-        </button>
-        <div class="progress-bar" id="progressBar">
-            <div class="progress-fill" id="progressFill"></div>
+        <button id="btnGenerate" class="btn-gen" onclick="generateAudio()"><span>⚡ GENERATE AUDIO (TURBO)</span></button>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="top-bar">
+        <div>
+            <span style="font-weight: bold;">Status:</span> 
+            <span id="statusText" class="status">Waiting for PDF...</span>
         </div>
+        <div style="font-size: 0.85rem; color: #64748b;">
+            <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
+        </div>
+    </div>
+
+    <div class="list-container" id="listContainer">
+        <div style="text-align:center; color:#94a3b8; margin-top:100px;">
+            <h3>Welcome to Heat Manager</h3>
+            <p>Upload a PDF or Image to see heats.</p>
+        </div>
+    </div>
+
+    <div class="go-container" id="goBtnContainer">
+        <button class="btn-go" onclick="triggerGo()">GO<span class="go-label">(Space)</span></button>
     </div>
 </div>
 
@@ -217,7 +234,7 @@
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:100px; font-size:0.75rem;" onchange="saveDictFromModal()">{"Nguyen":"Win"}</textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v29.0 (Polish)</div>
+        <div class="version-tag">v28.0 (Gold Standard)</div>
     </div>
 </div>
 
@@ -237,14 +254,12 @@
             <label>Click to Insert Variable:</label>
             <div class="var-chips">
                 <div class="var-chip" onclick="insertVar('{event_title}')">{event_title}</div>
-                <div class="var-chip" onclick="insertVar('{event}')">{event}</div>
-                <div class="var-chip" onclick="insertVar('{event_name}')">{event_name}</div>
                 <div class="var-chip" onclick="insertVar('{heat}')">{heat}</div>
                 <div class="var-chip" onclick="insertVar('{lane}')">{lane}</div>
-                <div class="var-chip" onclick="insertVar('{place}')">{place}</div>
-                <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
                 <div class="var-chip" onclick="insertVar('{name}')">{name}</div>
+                <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
+                <div class="var-chip" onclick="insertVar('{place}')">{place}</div>
             </div>
         </div>
         <button class="btn-gen" onclick="toggleScriptEditor()" style="margin-top:20px;">DONE</button>
@@ -317,7 +332,6 @@
         return text;
     }
 
-    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
@@ -378,7 +392,6 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- ROBUST PARSER (V29) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -440,7 +453,7 @@
                 if(mode === "result" && !currentHeat) currentHeat = "1";
 
                 const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                const displayTitle = `Event ${currentEvent} - ${currentEventName} - ${mode==="result"?"Results":"Heat "+currentHeat}`;
+                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat}`;
                 
                 parsedData.push({ 
                     heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
@@ -545,13 +558,6 @@
         el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
     }
 
-    // --- ORDINAL HELPER (1st, 2nd, 3rd) ---
-    function getOrdinal(n) {
-        let s = ["th", "st", "nd", "rd"];
-        let v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    }
-
     async function generateAudio() {
         const key = document.getElementById('apiKey').value;
         if(!key.startsWith('sk-')) { alert("Missing API Key. Check Settings."); toggleSettings(); return; }
@@ -569,7 +575,6 @@
             const hId = `h_${heatKey}`;
             if (forceRegen || !audioCache[hId]) {
                 let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName);
                 introText = applyHype(introText);
                 queue.push({ id: hId, text: introText });
             }
@@ -577,10 +582,7 @@
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
                     let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-                    // Apply Ordinal Place (1 -> 1st)
-                    let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-
-                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, s.place).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
                     for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
                     txt = applyHype(txt);
                     queue.push({ id: s.id, text: txt });
