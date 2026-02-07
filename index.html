@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v45 (Hy-Tek Edition)</title>
+    <title>Swim Announcer Ultimate v46 (Fuzzy Logic)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V45 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -265,7 +264,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v45.0 (Hy-Tek Parsing)</div>
+        <div class="version-tag">v46.0 (Fuzzy Logic)</div>
     </div>
 </div>
 
@@ -555,19 +554,15 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- HY-TEK REGEX PARSER ---
+    // --- FUZZY LOGIC PARSER (THE FIX) ---
     function manualParse(silent = false) {
         try {
             const raw = document.getElementById('dataInput').value;
-            const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
             let parsedData = [];
             let currentEvent = "Unknown";
             let currentEventName = "";
             let currentHeat = null;
-
-            // Helper to clean OCR garbage
-            const clean = (s) => s.replace(/[^a-zA-Z0-9\s,\.-]/g, "").trim();
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
@@ -578,59 +573,74 @@
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
                     currentEventName = evtMatch[2].replace(/Girls|Boys|Women|Men|Mixed/i, "").trim();
-                    currentHeat = null; // Reset heat on new event
+                    currentHeat = null;
                 }
 
-                // 2. Detect Heat Header (Specific to uploaded files)
-                // "Heat 1 of 6 Prelims" or "Heat 1 of 1 Semis"
+                // 2. Detect Heat Header
                 const hMatch = line.match(/Heat\s+(\d+)\s+of/i);
                 if(hMatch) currentHeat = hMatch[1];
 
-                // 3. Detect Swimmer Line (The hard part)
-                // Format: Lane | Name | Age | Team | Time
-                // Regex Breakdown:
-                // ^\s*(\d)     -> Lane (start of line)
-                // \s+          -> Spacer
-                // (.+?)        -> Name (Greedy until next digit)
-                // \s+          -> Spacer
-                // (\d{1,2})    -> Age (1 or 2 digits)
-                // \s+          -> Spacer
-                // ([A-Z-]+)    -> Team (UPPERCASE usually with hyphen)
-                // \s+          -> Spacer
-                // ([\d:.]+|NT|XNT) -> Time
+                // 3. FUZZY SCAVENGER
+                // Look for a Team Code (e.g. PAC-IL) as an Anchor
+                const teamMatch = line.match(/\b([A-Z]{2,5}-[A-Z]{2})\b/); // Matches PAC-IL, COHO-IL
                 
-                // Try strictly formatted first
-                let m = line.match(/^\s*(\d)\s+([A-Za-z\s,\.-]+?)\s+(\d{1,2})\s+([A-Z0-9-]+)\s+(NT|XNT|[\d:.]+)/i);
-
-                if (m && currentHeat) {
-                    let lane = m[1];
-                    let rawName = m[2].trim();
-                    let age = m[3];
-                    let team = m[4];
-                    let time = m[5];
-
-                    // Name Logic based on dropdown
-                    if (nameFormat === 'last_first' && rawName.includes(',')) {
-                        // Already formatted
-                    } else if (nameFormat === 'first_last' && !rawName.includes(',')) {
-                        // Already formatted
-                    } else if (nameFormat === 'last_first' && !rawName.includes(',')) {
-                        // Guess: Last word is Last Name? No, typically "First Last" in files
-                        // Do nothing, trust user setting
-                    }
+                if (teamMatch && currentHeat) {
+                    // We found a team code. This line is part of a swimmer entry.
+                    // Grab context: Previous line + Current Line + Next Line to handle splits
+                    let prev = (i > 0) ? lines[i-1] : "";
+                    let next = (i < lines.length - 1) ? lines[i+1] : "";
+                    let context = prev + " " + line + " " + next;
                     
-                    // Specific Fix for "Lilly P Davidson"
-                    if (rawName.match(/^[A-Z]\s/)) { 
-                        // Sometimes OCR puts "1 Name" as "1Name". 
+                    // Scavenge attributes from the context soup
+                    let team = teamMatch[1];
+                    let remaining = context.replace(team, "").trim();
+
+                    // Find Time (digits:digits.digits OR NT/XNT)
+                    let time = "NT";
+                    let timeM = remaining.match(/\b(\d{1,2}:\d{2}\.\d{2}|:?\d{2}\.\d{2}|NT|XNT)\b/i);
+                    if(timeM) {
+                        time = timeM[1].replace(/^:/, ""); // Fix :22.56 issues
+                        remaining = remaining.replace(timeM[0], "").trim();
                     }
 
-                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                    const displayTitle = `Event ${currentEvent} - Heat ${currentHeat} (${currentEventName})`;
+                    // Find Age (11-19) - Look for isolated digits
+                    let age = "";
+                    let ageM = remaining.match(/\b(1[1-9])\b/); 
+                    if(ageM) {
+                        age = ageM[1];
+                        remaining = remaining.replace(new RegExp(`\\b${age}\\b`), "").trim();
+                    }
+
+                    // Find Lane (1-9) - Look for single digit
+                    let lane = "";
+                    let laneM = remaining.match(/\b([1-9])\b/);
+                    if(laneM) {
+                        lane = laneM[1];
+                        remaining = remaining.replace(new RegExp(`\\b${lane}\\b`), "").trim();
+                    }
+
+                    // Cleanup Name (Remove garbage OCR chars)
+                    // Remove "Heat", "Prelims", common OCR noise like | ] .
+                    let name = remaining.replace(/Heat \d+ of \d+|Prelims|Event \d+|[|\]\[]/gi, "").trim();
+                    // Clean extra spaces
+                    name = name.replace(/\s+/g, " ");
                     
-                    parsedData.push({ 
-                        heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
-                        heat: currentHeat, lane: lane, place: lane, name: rawName, age: age, team: team, time: time
-                    });
+                    // Validation: Name must have letters
+                    if (name.match(/[a-zA-Z]{2,}/) && lane) {
+                        // Prevent duplicates (since we read 3 lines of context, we might hit the same swimmer twice)
+                        const uniqueId = `E${currentEvent}-H${currentHeat}-L${lane}`;
+                        const exists = parsedData.find(p => p.uniqueId === uniqueId);
+                        
+                        if(!exists) {
+                            parsedData.push({ 
+                                uniqueId: uniqueId, // Internal dedup key
+                                heatId: `E${currentEvent}-H${currentHeat}`, 
+                                heatTitle: `Event ${currentEvent} - Heat ${currentHeat} (${currentEventName})`, 
+                                event: currentEvent, eventName: currentEventName, 
+                                heat: currentHeat, lane: lane, place: lane, name: name, age: age, team: team, time: time
+                            });
+                        }
+                    }
                 }
             }
             
