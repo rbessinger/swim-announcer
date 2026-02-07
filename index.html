@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v16 (Event Names)</title>
+    <title>Swim Announcer Ultimate v17 (Photo/OCR Support)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* SIDEBAR */
         .sidebar { width: 360px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
@@ -19,7 +19,6 @@
 
         .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; position: relative; }
 
-        /* VIEW TOGGLING */
         .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
         .view-section.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -28,11 +27,6 @@
         input[type="text"], input[type="password"], textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
         input:focus, textarea:focus { border-color: var(--accent); outline: none; }
         
-        /* CHECKBOX */
-        .checkbox-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .checkbox-row input { width: auto; accent-color: var(--accent); cursor: pointer; }
-        .checkbox-row span { font-size: 0.8rem; color: #cbd5e1; }
-
         /* SLIDERS */
         input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
         .slider-group { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
@@ -55,6 +49,11 @@
         
         .btn-parse { background: #334155; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
         .btn-parse:hover { background: #475569; }
+
+        /* CHECKBOX */
+        .checkbox-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .checkbox-row input { width: auto; accent-color: var(--accent); cursor: pointer; }
+        .checkbox-row span { font-size: 0.8rem; color: #cbd5e1; }
 
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
@@ -139,9 +138,9 @@
             <div>
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
-                    <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
-                    <div class="file-upload-text">Click to upload PDF</div>
-                    <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
+                    <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
+                    <div class="file-upload-text">Drag PDF or Image here</div>
+                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
                 </label>
             </div>
 
@@ -202,8 +201,8 @@
 
             <div>
                 <label style="color:var(--orange);">Raw Data (Debug)</label>
-                <textarea id="dataInput" style="height:100px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-                <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
+                <textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
+                <button class="btn-parse" onclick="manualParse(); toggleSettings();">Force Parse Data</button>
             </div>
         </div>
 
@@ -238,7 +237,7 @@
     <div class="list-container" id="listContainer">
         <div style="text-align:center; color:#94a3b8; margin-top:100px;">
             <h3>Welcome to Heat Manager</h3>
-            <p>Upload a PDF to see heats sorted by Event.</p>
+            <p>Upload a PDF or Image (Photo) to see heats.</p>
         </div>
     </div>
 
@@ -329,11 +328,47 @@
         return text;
     }
 
-    async function handlePdfUpload(input) {
+    // --- UPLOAD HANDLER (PDF + IMG) ---
+    async function handleFileUpload(input) {
         if (!input.files[0]) return;
+        const file = input.files[0];
+        setStatus("Processing File...", "working");
+
+        if (file.type === "application/pdf") {
+            handlePdf(file);
+        } else if (file.type.startsWith("image/")) {
+            handleImage(file);
+        } else {
+            alert("Please upload a PDF or Image (JPG/PNG).");
+        }
+    }
+
+    async function handleImage(file) {
+        setStatus("Scanning Image (OCR)...", "working");
+        try {
+            const worker = await Tesseract.createWorker('eng');
+            const ret = await worker.recognize(file);
+            await worker.terminate();
+            
+            document.getElementById('dataInput').value = ret.data.text;
+            const count = manualParse(true);
+            
+            if(count === 0) {
+                setStatus("OCR Failed to find swimmers. Check Settings -> Raw Data.", "error");
+                alert("I scanned the image but didn't see the usual swimmer format. Check the Raw Data in settings.");
+            } else {
+                setStatus(`Found ${count} swimmers from Image.`, "ready");
+            }
+        } catch(e) {
+            console.error(e);
+            setStatus("OCR Error.", "error");
+        }
+    }
+
+    async function handlePdf(file) {
         setStatus("Reading PDF...", "working");
         try {
-            const arrayBuffer = await input.files[0].arrayBuffer();
+            const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             let fullText = "";
             for (let i = 1; i <= pdf.numPages; i++) {
@@ -374,17 +409,13 @@
         lines.forEach(line => {
             line = line.trim();
             
-            // Event Match: Look for "Event 101 Girls 50 Free..."
             const evtMatch = line.match(/Event\s+(\d+)\s+(.*)/i);
             if(evtMatch) {
                 currentEvent = evtMatch[1];
                 let rawEvtName = evtMatch[2].trim();
-                // Clean common PDF artifacts from event name
-                rawEvtName = rawEvtName.replace(/^[-–—]\s*/, ""); // remove leading dashes
-                rawEvtName = rawEvtName.replace(/["',]/g, ""); // remove quotes/commas
+                rawEvtName = rawEvtName.replace(/^[-–—]\s*/, "").replace(/["',]/g, "");
                 if(rawEvtName.length > 3) currentEventName = rawEvtName;
             } else {
-                // Fallback for just "Event 101" without name on same line
                 const shortEvt = line.match(/Event\s+(\d+)/i);
                 if(shortEvt) currentEvent = shortEvt[1];
             }
@@ -452,7 +483,7 @@
         container.innerHTML = "";
         
         if (heatOrder.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF to begin.</p></div>`;
+            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF or Image to begin.</p></div>`;
             return;
         }
         
@@ -540,10 +571,8 @@
         const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
         
-        // --- PARALLEL QUEUE ---
         const queue = [];
         
-        // Build Task List
         for (const heatKey of heatOrder) {
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
