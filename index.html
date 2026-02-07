@@ -2,18 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v25 (Stable)</title>
+    <title>Swim Announcer Ultimate v20 (Pro Editor)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
         /* SIDEBAR */
-        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
@@ -21,7 +20,6 @@
 
         .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; position: relative; }
 
-        /* VIEW TOGGLING */
         .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
         .view-section.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -62,9 +60,8 @@
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
-        /* MAIN DASHBOARD */
-        .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
-        .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 10; flex-shrink: 0; }
+        .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; }
+        .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .status { font-weight: bold; font-size: 0.9rem; color: #64748b; }
         .status.ready { color: var(--green); }
         .status.working { color: var(--accent); }
@@ -101,6 +98,7 @@
         .has-audio .audio-dot { background: var(--green); box-shadow: 0 0 4px var(--green); }
 
         .go-container { position: absolute; bottom: 30px; right: 30px; width: 120px; height: 120px; z-index: 100; transition: 0.2s; }
+        /* Dim GO button when editing */
         .go-container.disabled { opacity: 0.3; pointer-events: none; filter: grayscale(100%); }
         
         .btn-go { 
@@ -122,14 +120,14 @@
         .modal-content { 
             background: #0f172a; width: 600px; padding: 30px; border-radius: 12px; 
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; 
-            color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative;
+            color: #94a3b8; display: flex; flex-direction: column; gap: 20px;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
         .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
         .close-btn:hover { color: white; }
-        .version-tag { position: absolute; bottom: 15px; right: 20px; font-size: 0.7rem; color: #334155; font-family: monospace; }
 
+        /* SCRIPT VARIABLES CHIPS */
         .var-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
         .var-chip { 
             background: #1e293b; color: var(--accent); border: 1px solid #334155; 
@@ -155,8 +153,8 @@
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
                     <span id="fileNameDisplay" style="font-size:1.5rem;">📄 / 📷</span>
-                    <div class="file-upload-text">Drag PDF or Image (HEIC/JPG)</div>
-                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg,.heic" onchange="handleFileUpload(this)">
+                    <div class="file-upload-text">Drag PDF or Image here</div>
+                    <input type="file" id="pdfUpload" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(this)">
                 </label>
             </div>
 
@@ -240,35 +238,39 @@
     </div>
 </div>
 
+<div class="main">
+    <div class="top-bar">
+        <div>
+            <span style="font-weight: bold;">Status:</span> 
+            <span id="statusText" class="status">Waiting for PDF...</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #64748b;">
+            <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
+        </div>
+    </div>
+
+    <div class="list-container" id="listContainer">
+        <div style="text-align:center; color:#94a3b8; margin-top:100px;">
+            <h3>Welcome to Heat Manager</h3>
+            <p>Upload a PDF or Image to see heats.</p>
+        </div>
+    </div>
+
+    <div class="go-container" id="goBtnContainer">
+        <button class="btn-go" onclick="triggerGo()">
+            GO
+            <span class="go-label">(Space)</span>
+        </button>
+    </div>
+</div>
+
 <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) toggleSettings()">
     <div class="modal-content">
         <div class="modal-header">
             <div class="modal-title">⚙️ SETTINGS</div>
             <button class="close-btn" onclick="toggleSettings()">&times;</button>
         </div>
-        
-        <div>
-            <label>OpenAI API Key</label>
-            <input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()">
-        </div>
-
-        <div>
-            <label>Phonetic Dictionary (JSON)</label>
-            <textarea id="dictInputModal" style="height:100px; font-size:0.75rem;" onchange="saveDictFromModal()">
-{
-  "Nguyen": "Win",
-  "Gavrilos": "Gah-vree-los"
-}
-            </textarea>
-        </div>
-
-        <div>
-            <label style="color:var(--orange);">Raw Data (Debug)</label>
-            <textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-            <button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button>
-        </div>
-        
-        <div class="version-tag">v25.0 (Stable)</div>
+        <p style="color:#64748b;">(Use sidebar settings for now)</p>
     </div>
 </div>
 
@@ -285,24 +287,19 @@
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
         </div>
 
-        <label>EVENT INTRO SCRIPT</label>
-        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
-
-        <label>SWIMMER SCRIPT</label>
-        <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
+        <textarea id="modalTemplateInput" style="height:200px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
         
         <div style="margin-top:10px;">
             <label>Click to Insert Variable:</label>
             <div class="var-chips">
-                <div class="var-chip" onclick="insertVar('{event_title}')">{event_title}</div>
                 <div class="var-chip" onclick="insertVar('{event}')">{event}</div>
                 <div class="var-chip" onclick="insertVar('{event_name}')">{event_name}</div>
                 <div class="var-chip" onclick="insertVar('{heat}')">{heat}</div>
                 <div class="var-chip" onclick="insertVar('{lane}')">{lane}</div>
-                <div class="var-chip" onclick="insertVar('{place}')">{place}</div>
                 <div class="var-chip" onclick="insertVar('{team}')">{team}</div>
                 <div class="var-chip" onclick="insertVar('{name}')">{name}</div>
                 <div class="var-chip" onclick="insertVar('{time}')">{time}</div>
+                <div class="var-chip" onclick="insertVar('{age}')">{age}</div>
             </div>
         </div>
 
@@ -319,82 +316,76 @@
     let isScriptOpen = false;
 
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
-            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
-        }
+        if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
-        
-        // Sync Dict
-        if(localStorage.getItem('phonetic_dict')) {
-            document.getElementById('dictInput').value = localStorage.getItem('phonetic_dict');
-            document.getElementById('dictInputModal').value = localStorage.getItem('phonetic_dict');
-        }
-
         loadTemplateUI();
         updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
     function toggleSettings() {
-        const modal = document.getElementById('settingsModal');
-        modal.classList.toggle('active');
-        // Sync Data Input
-        document.getElementById('dataInputModal').value = document.getElementById('dataInput').value;
+        isSettingsOpen = !isSettingsOpen;
+        document.getElementById('viewMain').classList.toggle('active', !isSettingsOpen);
+        document.getElementById('viewSettings').classList.toggle('active', isSettingsOpen);
+        document.getElementById('sidebarTitle').innerText = isSettingsOpen ? "⚙️ SETTINGS" : "🏊 RUN SHOW";
     }
 
-    function saveConfig() { 
-        localStorage.setItem('openai_key', document.getElementById('apiKey').value); 
-        localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); 
+    // --- SCRIPT EDITOR LOGIC ---
+    function toggleScriptEditor() {
+        isScriptOpen = !isScriptOpen;
+        const modal = document.getElementById('scriptModal');
+        modal.classList.toggle('active', isScriptOpen);
+        
+        // Sync values
+        if(isScriptOpen) {
+            document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value;
+            document.getElementById('goBtnContainer').classList.add('disabled');
+        } else {
+            document.getElementById('goBtnContainer').classList.remove('disabled');
+        }
     }
+
+    function syncScript() {
+        const val = document.getElementById('modalTemplateInput').value;
+        document.getElementById('templatePreview').value = val;
+        localStorage.setItem('t_'+currentTab, val);
+        markDirty();
+    }
+
+    function insertVar(text) {
+        const el = document.getElementById('modalTemplateInput');
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const val = el.value;
+        el.value = val.substring(0, start) + text + val.substring(end);
+        el.selectionStart = el.selectionEnd = start + text.length;
+        el.focus();
+        syncScript();
+    }
+
+    function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
     
-    function saveConfigFromModal() {
-        const key = document.getElementById('apiKeyModal').value;
-        document.getElementById('apiKey').value = key;
-        localStorage.setItem('openai_key', key);
-    }
-
-    function saveDictFromModal() {
-        const dict = document.getElementById('dictInputModal').value;
-        document.getElementById('dictInput').value = dict;
-        localStorage.setItem('phonetic_dict', dict);
-    }
-
-    function manualParseFromModal() {
-        document.getElementById('dataInput').value = document.getElementById('dataInputModal').value;
-        manualParse();
-    }
-
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.",
-        3: "In {place} place, with a time of {time}, from {team}, {name}."
+        3: "Finishing in lane {lane}, with a time of {time}, {name}."
     };
-    
-    const defaultIntros = {
-        1: "Now swimming {event_title}.",
-        2: "Ladies and gentlemen, please welcome the finalists for {event_title}.",
-        3: "And now, the results for {event_title}."
-    };
-
     let currentTab = 1;
     
     function switchTab(t) { 
         currentTab=t; 
         loadTemplateUI(); 
         markDirty(); 
+        // Update both sidebars and modals
         document.querySelectorAll('.tab-btn').forEach((b)=>b.classList.remove('active'));
         document.getElementById('btnTab'+t).classList.add('active');
         document.getElementById('modalTab'+t).classList.add('active');
     }
     
     function loadTemplateUI() { 
-        const bodyVal = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
-        const introVal = localStorage.getItem('intro_'+currentTab) || defaultIntros[currentTab];
-        
-        document.getElementById('templatePreview').value = bodyVal;
-        document.getElementById('modalTemplateInput').value = bodyVal;
-        document.getElementById('introScriptInput').value = introVal;
+        const val = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab];
+        document.getElementById('templatePreview').value = val;
+        document.getElementById('modalTemplateInput').value = val;
     }
     
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
@@ -415,40 +406,18 @@
             let hText = text.toUpperCase();
             hText = hText.replace(/LANE (\d+)/g, "LANE... $1");
             hText = hText.replace(/REPRESENTING/g, "REPRESENTING...");
-            hText = hText.replace(/PLACE/g, "PLACE...");
             return hText.replace(/\./g, "!!!") + "!!!";
         }
         return text;
     }
 
-    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
         setStatus("Processing File...", "working");
-        
-        const type = file.type.toLowerCase();
-        
-        if (type === "application/pdf") {
-            handlePdf(file);
-        } else if (type.includes("heic")) {
-            handleHeic(file);
-        } else if (type.startsWith("image/")) {
-            handleImage(file);
-        } else {
-            alert("Please upload PDF, JPG, PNG, or HEIC.");
-        }
-    }
-
-    async function handleHeic(file) {
-        setStatus("Converting HEIC...", "working");
-        try {
-            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.7 });
-            handleImage(blob);
-        } catch(e) {
-            console.error(e);
-            setStatus("HEIC Conversion Failed.", "error");
-        }
+        if (file.type === "application/pdf") handlePdf(file);
+        else if (file.type.startsWith("image/")) handleImage(file);
+        else alert("Please upload a PDF or Image (JPG/PNG).");
     }
 
     async function handleImage(file) {
@@ -503,83 +472,53 @@
 
         for(let i=0; i<lines.length; i++) {
             let line = lines[i].trim();
-            
-            // 1. EVENT DETECTION (UNIVERSAL)
-            // Case A: "Event 101 Girls 50 Free..." (One Line)
-            const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
+            const evtMatch = line.match(/Event\s+(\d+)\s+(.*)/i);
             if(evtMatch) {
-                // If it captured "102" and "Boys...", use it
                 currentEvent = evtMatch[1];
-                let rawName = evtMatch[2];
-                // Clean dashes, commas, quotes
-                rawName = rawName.replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-                if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) {
-                    currentEventName = rawName;
-                }
-            } 
-            else {
-                // Case B: Split Line Check
+                let rawEvtName = evtMatch[2].trim();
+                rawEvtName = rawEvtName.replace(/^[-–—]\s*/, "").replace(/["',]/g, "");
+                if(rawEvtName.length > 3) currentEventName = rawEvtName;
+            } else {
                 const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
                 if(shortEvt) {
                     currentEvent = shortEvt[1];
-                    // Peek ahead
                     if (i + 1 < lines.length) {
                         let nextLine = lines[i+1].trim();
-                        if (!nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i) && nextLine.length > 3) {
-                            currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
+                        if (!nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
+                            let cleanNext = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "");
+                            if (cleanNext.length > 3) currentEventName = cleanNext;
                         }
                     }
                 }
             }
 
-            // 2. HEAT DETECTION
             const hMatch = line.match(/Heat\s+(\d+)/i);
             if(hMatch) currentHeat = hMatch[1];
             if(line.includes("Alternates")) currentHeat = null;
 
-            // 3. ROW DETECTION
-            // Standard Heat Sheet (Lane Name ... Time)
-            let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-            let mode = "heat";
-            if(!m) {
-                // Results Mode (Rank Name ... Time) - Grab end of line for time
-                m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
-                mode = "result";
-            }
+            if(currentHeat) {
+                const m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                if(m) {
+                    let rawName = m[2].trim();
+                    let rawTeam = m[4].trim();
+                    rawTeam = rawTeam.replace(/-[A-Z]{2}$/, "");
 
-            if(m && (currentHeat || mode === "result")) {
-                let rawName = m[2].trim();
-                let rawTeam = m[4].trim();
-                rawTeam = rawTeam.replace(/-[A-Z]{2}$/, "");
-
-                if (nameFormat === 'last_first' && rawName.includes(',')) {
-                    const parts = rawName.split(',');
-                    if(parts.length >= 2) {
-                        let last = parts[0].trim();
-                        let first = parts[1].trim();
-                        first = first.replace(/\s+[A-Z]\.?$/, "");
-                        rawName = `${first} ${last}`;
+                    if (nameFormat === 'last_first') {
+                        if (rawName.includes(',')) {
+                            const parts = rawName.split(',');
+                            if(parts.length >= 2) {
+                                let last = parts[0].trim();
+                                let first = parts[1].trim();
+                                first = first.replace(/\s+[A-Z]\.?$/, "");
+                                rawName = `${first} ${last}`;
+                            }
+                        }
                     }
+
+                    const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+                    const displayTitle = `Event ${currentEvent} - Heat ${currentHeat}`;
+                    parsedData.push({ heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, heat: currentHeat, lane: m[1], name: rawName, age: m[3], team: rawTeam, time: m[5].toUpperCase() });
                 }
-
-                if(mode === "result" && !currentHeat) currentHeat = "1";
-
-                const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat}`;
-                
-                parsedData.push({ 
-                    heatId: uniqueHeatId,
-                    heatTitle: displayTitle,
-                    event: currentEvent,
-                    eventName: currentEventName,
-                    heat: currentHeat,
-                    lane: m[1], 
-                    place: m[1], 
-                    name: rawName, 
-                    age: m[3],
-                    team: rawTeam, 
-                    time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
-                });
             }
         }
         
@@ -677,45 +616,6 @@
     function toggleScratch(heat, idx) { heats[heat].swimmers[idx].scratched = !heats[heat].swimmers[idx].scratched; renderBoard(); }
     function selectCue(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); }
 
-    // --- SCRIPT EDITOR SYNC LOGIC ---
-    function toggleScriptEditor() {
-        isScriptOpen = !isScriptOpen;
-        const modal = document.getElementById('scriptModal');
-        modal.classList.toggle('active', isScriptOpen);
-        
-        if(isScriptOpen) {
-            document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value;
-            document.getElementById('goBtnContainer').classList.add('disabled');
-        } else {
-            document.getElementById('goBtnContainer').classList.remove('disabled');
-        }
-    }
-
-    function syncScript() {
-        const bodyVal = document.getElementById('modalTemplateInput').value;
-        const introVal = document.getElementById('introScriptInput').value;
-        
-        document.getElementById('templatePreview').value = bodyVal;
-        
-        localStorage.setItem('t_'+currentTab, bodyVal);
-        localStorage.setItem('intro_'+currentTab, introVal);
-        
-        markDirty();
-    }
-
-    function insertVar(text) {
-        let el = document.activeElement;
-        if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
-        
-        const start = el.selectionStart;
-        const end = el.selectionEnd;
-        const val = el.value;
-        el.value = val.substring(0, start) + text + val.substring(end);
-        el.selectionStart = el.selectionEnd = start + text.length;
-        el.focus();
-        syncScript();
-    }
-
     async function generateAudio() {
         const key = document.getElementById('apiKey').value;
         if(!key.startsWith('sk-')) { alert("Missing API Key. Check Settings."); toggleSettings(); return; }
@@ -723,8 +623,7 @@
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
         
-        const template = document.getElementById('modalTemplateInput').value; 
-        const introTemplate = document.getElementById('introScriptInput').value;
+        const template = document.getElementById('modalTemplateInput').value; // Use modal val
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
@@ -736,18 +635,10 @@
             const hId = `h_${heatKey}`;
             
             if (forceRegen || !audioCache[hId]) {
-                let introText = introTemplate;
-                let eventTitle = `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}`;
-                if (group.swimmers[0].heat) eventTitle += `, Heat ${group.swimmers[0].heat}`;
-                else eventTitle += ", Results";
-
-                introText = introText.replace(/{event_title}/g, eventTitle);
-                
-                introText = introText
-                    .replace(/{event}/g, group.swimmers[0].event)
-                    .replace(/{event_name}/g, group.swimmers[0].eventName)
-                    .replace(/{heat}/g, group.swimmers[0].heat);
-
+                let introText = `Now swimming ${group.title}.`;
+                if(group.swimmers[0].eventName) {
+                    introText = `Now swimming Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}. Heat ${group.swimmers[0].heat}.`;
+                }
                 introText = applyHype(introText);
                 queue.push({ id: hId, text: introText });
             }
@@ -755,15 +646,11 @@
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
-                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-
                     let txt = template
-                        .replace(/{event_title}/g, sEventTitle)
                         .replace(/{event}/g, s.event)
                         .replace(/{event_name}/g, s.eventName)
                         .replace(/{heat}/g, s.heat)
                         .replace(/{lane}/g, s.lane)
-                        .replace(/{place}/g, s.place)
                         .replace(/{age}/g, s.age)
                         .replace(/{team}/g, s.team)
                         .replace(/{name}/g, s.name)
@@ -847,8 +734,11 @@
         else setStatus("No Audio Generated.", "working");
     }
 
+    // --- KEYBOARD LISTENERS (SPACEBAR FIX) ---
     document.addEventListener('keydown', (e) => {
+        // IGNORE if typing in a text field
         if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+
         if(!heats || Object.keys(heats).length === 0) return;
         if(e.code === 'Space') { e.preventDefault(); triggerGo(); } 
         else if(e.code === 'ArrowDown') navigate(1);
@@ -862,7 +752,10 @@
             heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); });
         });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
-        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; else currIdx += dir;
+        
+        if(currIdx === -1 && flatMap.length > 0) currIdx = 0; 
+        else currIdx += dir;
+        
         if(currIdx >= 0 && currIdx < flatMap.length) {
             currentSelection = flatMap[currIdx]; renderBoard();
             const el = document.querySelector('.active'); if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
