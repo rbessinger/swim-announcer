@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v46 (Crash Proof)</title>
+    <title>Swim Announcer Ultimate v44 (Stop Button + 4 Scripts)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V46 LAYOUT --- */
+        /* --- STABLE V44 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -72,12 +72,6 @@
         .status.error { color: var(--red); }
         .status.stopped { color: var(--red); animation: none; }
 
-        .view-controls { display: flex; gap: 10px; background: #e2e8f0; padding: 4px; border-radius: 8px; }
-        .view-btn { border: none; background: none; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; color: #64748b; cursor: pointer; transition: 0.2s; }
-        .view-btn.active { background: white; color: var(--accent); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-
-        .search-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; width: 200px; }
-
         .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; padding-bottom: 140px; }
         
         .heat-block { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e2e8f0; overflow: hidden; }
@@ -94,14 +88,6 @@
         .swimmer-row.dragging { opacity: 0.5; background: #e2e8f0; border: 2px dashed #94a3b8; }
         .swimmer-row.scratched { background: #f8fafc; opacity: 0.6; }
         .swimmer-row.scratched .name-text { text-decoration: line-through; color: #94a3b8; }
-
-        .roster-row { display: flex; align-items: center; padding: 15px 20px; background: white; border: 1px solid #e2e8f0; margin-bottom: 10px; border-radius: 8px; transition: 0.1s; cursor: pointer; }
-        .roster-row:hover { border-color: var(--accent); background: #f8fafc; }
-        .roster-info { flex: 1; }
-        .roster-meta { font-size: 0.8rem; color: #94a3b8; margin-top: 3px; }
-        .play-icon { font-size: 1.5rem; color: #cbd5e1; transition: 0.2s; }
-        .roster-row:hover .play-icon { color: var(--green); transform: scale(1.1); }
-        .roster-row.no-audio .play-icon { color: #f1f5f9; }
 
         .col-lane { width: 50px; font-weight: 800; font-size: 1.2rem; color: #cbd5e1; text-align: center; cursor: grab; }
         .col-info { flex: 1; padding: 0 15px; }
@@ -246,17 +232,17 @@
 
 <div class="main">
     <div class="top-bar">
-        <div class="view-controls">
-            <button class="view-btn active" id="viewHeatsBtn" onclick="switchView('heats')">Heats</button>
-            <button class="view-btn" id="viewRosterBtn" onclick="switchView('roster')">Roster</button>
+        <div>
+            <span style="font-weight: bold;">Status:</span> 
+            <span id="statusText" class="status">Waiting for PDF...</span>
         </div>
-        
-        <input type="text" id="rosterSearch" class="search-box" placeholder="Search Swimmers..." oninput="renderRoster()" style="display:none;">
-
         <div style="display:flex; align-items:center; gap:20px;">
             <button class="btn-stop-main" onclick="stopPlayback()">
                 🛑 STOP <span style="font-size:0.7rem; opacity:0.8;">(Esc)</span>
             </button>
+            <div style="font-size: 0.85rem; color: #64748b;">
+                <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
+            </div>
         </div>
     </div>
 
@@ -279,7 +265,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v46.0 (Safe Mode)</div>
+        <div class="version-tag">v44.0 (Stop + 4 Scripts)</div>
     </div>
 </div>
 
@@ -317,8 +303,7 @@
 <script>
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
-    let currentAudioObject = null;
-    let viewMode = 'heats'; // 'heats' or 'roster'
+    let currentAudioObject = null; // Track playing audio for Stop feature
 
     // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
@@ -413,10 +398,7 @@
         try {
             heats = JSON.parse(localStorage.getItem('saved_heats'));
             heatOrder = JSON.parse(localStorage.getItem('saved_order'));
-            if(heats && heatOrder) { 
-                // Ensure default view is heats
-                switchView('heats');
-            }
+            if(heats && heatOrder) { renderBoard(); setStatus("Restored previous session.", "ready"); }
         } catch(e) { console.error(e); }
         loadTemplateUI();
     }
@@ -449,6 +431,7 @@
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
+    // --- TEMPLATES (ADDED 4TH OPTION) ---
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
@@ -500,77 +483,6 @@
             return hText.replace(/\./g, "!!!") + "!!!";
         }
         return text;
-    }
-
-    // --- VIEW SWITCHING ---
-    function switchView(mode) {
-        viewMode = mode;
-        const heatBtn = document.getElementById('viewHeatsBtn');
-        const rosterBtn = document.getElementById('viewRosterBtn');
-        const searchBox = document.getElementById('rosterSearch');
-        const goBtn = document.getElementById('goBtnContainer');
-
-        if(mode === 'heats') {
-            heatBtn.classList.add('active'); rosterBtn.classList.remove('active');
-            searchBox.style.display = 'none';
-            goBtn.style.display = 'flex'; // Show big green button
-            renderBoard();
-        } else {
-            rosterBtn.classList.add('active'); heatBtn.classList.remove('active');
-            searchBox.style.display = 'block';
-            searchBox.focus();
-            goBtn.style.display = 'none'; // Hide big green button in roster mode
-            renderRoster();
-        }
-    }
-
-    function renderRoster() {
-        const container = document.getElementById('listContainer');
-        container.innerHTML = "";
-        
-        const query = document.getElementById('rosterSearch').value.toLowerCase();
-        let roster = [];
-        
-        // Flatten list
-        Object.keys(heats).forEach(hKey => {
-            const h = heats[hKey];
-            h.swimmers.forEach((s, i) => {
-                if(!s.scratched) {
-                    roster.push({ ...s, heatTitle: h.title, originalHeat: hKey, originalIndex: i });
-                }
-            });
-        });
-
-        // Filter & Sort
-        roster = roster.filter(s => s.name.toLowerCase().includes(query) || s.team.toLowerCase().includes(query));
-        roster.sort((a,b) => a.name.localeCompare(b.name));
-
-        if(roster.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:50px;">No swimmers found matching "${query}"</div>`;
-            return;
-        }
-
-        roster.forEach(s => {
-            const hasAudio = !!audioCache[s.id];
-            const row = document.createElement('div');
-            row.className = `roster-row ${hasAudio ? '' : 'no-audio'}`;
-            row.onclick = () => playSpecific(s.originalHeat, s.originalIndex);
-            
-            row.innerHTML = `
-                <div class="roster-info">
-                    <div style="font-weight:bold; font-size:1.1rem; color:#334155;">${s.name}</div>
-                    <div class="roster-meta">${s.team} • ${s.heatTitle} • Lane ${s.lane}</div>
-                </div>
-                <div class="play-icon">${hasAudio ? '▶️' : '⚠️'}</div>
-            `;
-            container.appendChild(row);
-        });
-    }
-
-    function playSpecific(heat, index) {
-        // Switch context for playback but stay in Roster view visually
-        currentSelection = { heat, index };
-        playSelection();
     }
 
     // --- FILE HANDLING ---
@@ -706,7 +618,7 @@
                 });
                 heatOrder.sort(); 
                 saveSession();
-                switchView('heats'); // Go to heats on load
+                renderBoard();
             }
             return parsedData.length;
         } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
@@ -817,99 +729,72 @@
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
-        const btn = document.getElementById('btnGenerate');
         
-        try {
-            const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
-            let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
+        // Custom Voice ID Logic
+        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
 
-            if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
-            if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
 
-            // Safe Dictionary Parse
-            let dict = {};
-            try {
-                dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-            } catch(e) {
-                alert("Dictionary Error: Invalid JSON. Please fix syntax.");
-                return; 
-            }
-
-            btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
-            const template = document.getElementById('modalTemplateInput').value; 
-            const introTemplate = document.getElementById('introScriptInput').value;
-            const voice = document.getElementById('voiceSelect').value;
-            const forceRegen = document.getElementById('forceRegen').checked;
-            const queue = [];
+        const btn = document.getElementById('btnGenerate');
+        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+        const template = document.getElementById('modalTemplateInput').value; 
+        const introTemplate = document.getElementById('introScriptInput').value;
+        const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
+        const voice = document.getElementById('voiceSelect').value;
+        const forceRegen = document.getElementById('forceRegen').checked;
+        const queue = [];
+        
+        for (const heatKey of heatOrder) {
+            const group = heats[heatKey];
+            const hId = `h_${heatKey}`;
             
-            for (const heatKey of heatOrder) {
-                const group = heats[heatKey];
-                // Safety: Skip empty groups
-                if (!group.swimmers || group.swimmers.length === 0) continue;
-
-                const hId = `h_${heatKey}`;
-                
-                if (forceRegen || !audioCache[hId]) {
-                    let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                    introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
-                    introText = applyHype(introText);
-                    queue.push({ id: hId, text: introText });
-                }
-                for (const s of group.swimmers) {
-                    if(s.scratched) continue;
-                    if (forceRegen || !audioCache[s.id]) {
-                        let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-                        let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-                        let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
-                        for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                        txt = applyHype(txt);
-                        queue.push({ id: s.id, text: txt });
-                    }
+            if (forceRegen || !audioCache[hId]) {
+                let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                introText = applyHype(introText);
+                queue.push({ id: hId, text: introText });
+            }
+            for (const s of group.swimmers) {
+                if(s.scratched) continue;
+                if (forceRegen || !audioCache[s.id]) {
+                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                    let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+                    txt = applyHype(txt);
+                    queue.push({ id: s.id, text: txt });
                 }
             }
-
-            const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
-            
-            let completed = 0; const total = queue.length;
-            if (total === 0) { 
-                setStatus("Nothing new to generate.", "ready"); 
-                return; 
-            }
-            
-            setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
-
-            async function worker() {
-                while (queue.length > 0) {
-                    const task = queue.shift();
-                    try {
-                        let res = null;
-                        if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                        else res = await fetchOpenAI(task.text, voice, oaKey);
-                        
-                        if(res) audioCache[task.id] = res;
-                    } catch(e) { 
-                        console.error(e); 
-                        alert(`API Error: ${e.message}`);
-                    }
-                    completed++;
-                    document.getElementById('progressFill').style.width = (completed/total*100)+"%";
-                }
-            }
-            const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
-            await Promise.all(workers);
-            
-            setStatus("Audio Ready.", "ready");
-            if(viewMode === 'heats') renderBoard();
-            else renderRoster();
-
-        } catch (err) {
-            console.error(err);
-            alert("Crash Prevented: " + err.message);
-        } finally {
-            // ALWAYS reset button
-            btn.disabled = false; 
-            btn.innerText = "⚡ GENERATE AUDIO"; 
         }
+
+        const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+        
+        let completed = 0; const total = queue.length;
+        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
+        setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
+
+        async function worker() {
+            while (queue.length > 0) {
+                const task = queue.shift();
+                try {
+                    let res = null;
+                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                    else res = await fetchOpenAI(task.text, voice, oaKey);
+                    
+                    if(res) audioCache[task.id] = res;
+                } catch(e) { 
+                    console.error(e); 
+                    alert(`API Error: ${e.message}`);
+                }
+                completed++;
+                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+            }
+        }
+        const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+        await Promise.all(workers);
+        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
     async function fetchOpenAI(text, voice, key) {
@@ -936,6 +821,7 @@
         return new Audio(URL.createObjectURL(await r.blob()));
     }
 
+    // --- STOP PLAYBACK ---
     function stopPlayback() {
         if(currentAudioObject) {
             currentAudioObject.pause();
@@ -946,14 +832,13 @@
     }
 
     function triggerGo() {
-        if(viewMode !== 'heats') return; 
         const { heat, index } = currentSelection;
         if(heat === null) { if(heatOrder.length > 0) selectCue(heatOrder[0], -1); else return; }
         playSelection(); navigate(1);
     }
 
     function playSelection() {
-        stopPlayback(); 
+        stopPlayback(); // Auto-stop previous
         const { heat, index } = currentSelection;
         let aud = null; let msg = "";
         if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
@@ -976,7 +861,6 @@
     });
 
     function navigate(dir) {
-        if(viewMode !== 'heats') return; 
         let flatMap = [];
         heatOrder.forEach(h => { flatMap.push({ heat: h, index: -1 }); heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); }); });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
