@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v37 (Custom Voice)</title>
+    <title>Swim Announcer Ultimate v38 (Sanitized)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -246,7 +246,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v37.0 (API Fix)</div>
+        <div class="version-tag">v38.0 (Sanitized Keys)</div>
     </div>
 </div>
 
@@ -288,6 +288,13 @@
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
+
+    // --- CLEAN KEY INPUT (V38 FIX) ---
+    function cleanInput(str) {
+        if (!str) return "";
+        // Remove zero-width spaces, newlines, tabs, and non-ascii junk
+        return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    }
 
     window.onload = () => {
         // Init Keys
@@ -383,14 +390,14 @@
     }
 
     function saveConfig() { 
-        localStorage.setItem('openai_key', document.getElementById('apiKey').value); 
-        localStorage.setItem('eleven_key', document.getElementById('elevenKey').value); 
+        localStorage.setItem('openai_key', cleanInput(document.getElementById('apiKey').value)); 
+        localStorage.setItem('eleven_key', cleanInput(document.getElementById('elevenKey').value)); 
         localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
-        localStorage.setItem('custom_voice_id', document.getElementById('customVoiceId').value);
+        localStorage.setItem('custom_voice_id', cleanInput(document.getElementById('customVoiceId').value));
     }
     function saveConfigFromModal() { 
-        const oa = document.getElementById('apiKeyModal').value;
-        const xi = document.getElementById('elevenKeyModal').value;
+        const oa = cleanInput(document.getElementById('apiKeyModal').value);
+        const xi = cleanInput(document.getElementById('elevenKeyModal').value);
         document.getElementById('apiKey').value = oa; 
         document.getElementById('elevenKey').value = xi;
         localStorage.setItem('openai_key', oa);
@@ -684,11 +691,11 @@
 
     async function generateAudio() {
         const engine = document.getElementById('engineSelect').value;
-        const oaKey = document.getElementById('apiKey').value;
-        const xiKey = document.getElementById('elevenKey').value;
+        const oaKey = cleanInput(document.getElementById('apiKey').value);
+        const xiKey = cleanInput(document.getElementById('elevenKey').value);
         
         // Custom Voice ID Logic
-        const customVoiceId = document.getElementById('customVoiceId').value;
+        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
         let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
 
         if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
@@ -699,6 +706,7 @@
         const template = document.getElementById('modalTemplateInput').value; 
         const introTemplate = document.getElementById('introScriptInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
+        const voice = document.getElementById('voiceSelect').value;
         const forceRegen = document.getElementById('forceRegen').checked;
         const queue = [];
         
@@ -734,12 +742,12 @@
                 try {
                     let res = null;
                     if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                    else res = await fetchOpenAI(task.text, voiceId, oaKey);
+                    else res = await fetchOpenAI(task.text, voice, oaKey);
                     
                     if(res) audioCache[task.id] = res;
                 } catch(e) { 
                     console.error(e); 
-                    alert("API Error: " + e.message); // Explicit Alert
+                    alert(`API Error: ${e.message}`);
                 }
                 completed++;
                 document.getElementById('progressFill').style.width = (completed/total*100)+"%";
@@ -752,7 +760,7 @@
 
     async function fetchOpenAI(text, voice, key) {
         const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: 1.0 }) });
-        if(!r.ok) throw new Error(`OpenAI Error: ${r.status}`);
+        if(!r.ok) throw new Error(`OpenAI ${r.status}`);
         return new Audio(URL.createObjectURL(await r.blob()));
     }
 
@@ -761,7 +769,7 @@
             method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
             body: JSON.stringify({ text: text, model_id: "eleven_monolingual_v1", voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
         });
-        if(!r.ok) throw new Error(`ElevenLabs Error: ${r.status}`);
+        if(!r.ok) throw new Error(`ElevenLabs ${r.status}`);
         return new Audio(URL.createObjectURL(await r.blob()));
     }
 
