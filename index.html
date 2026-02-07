@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v44 (Stop Button + 4 Scripts)</title>
+    <title>Swim Announcer Ultimate v52 (Header Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V44 LAYOUT --- */
+        /* --- STABLE V52 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -72,6 +72,12 @@
         .status.error { color: var(--red); }
         .status.stopped { color: var(--red); animation: none; }
 
+        .view-controls { display: flex; gap: 10px; background: #e2e8f0; padding: 4px; border-radius: 8px; }
+        .view-btn { border: none; background: none; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; color: #64748b; cursor: pointer; transition: 0.2s; }
+        .view-btn.active { background: white; color: var(--accent); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        .search-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; width: 200px; }
+
         .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; padding-bottom: 140px; }
         
         .heat-block { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e2e8f0; overflow: hidden; }
@@ -88,6 +94,14 @@
         .swimmer-row.dragging { opacity: 0.5; background: #e2e8f0; border: 2px dashed #94a3b8; }
         .swimmer-row.scratched { background: #f8fafc; opacity: 0.6; }
         .swimmer-row.scratched .name-text { text-decoration: line-through; color: #94a3b8; }
+
+        .roster-row { display: flex; align-items: center; padding: 15px 20px; background: white; border: 1px solid #e2e8f0; margin-bottom: 10px; border-radius: 8px; transition: 0.1s; cursor: pointer; }
+        .roster-row:hover { border-color: var(--accent); background: #f8fafc; }
+        .roster-info { flex: 1; }
+        .roster-meta { font-size: 0.8rem; color: #94a3b8; margin-top: 3px; }
+        .play-icon { font-size: 1.5rem; color: #cbd5e1; transition: 0.2s; }
+        .roster-row:hover .play-icon { color: var(--green); transform: scale(1.1); }
+        .roster-row.no-audio .play-icon { color: #f1f5f9; }
 
         .col-lane { width: 50px; font-weight: 800; font-size: 1.2rem; color: #cbd5e1; text-align: center; cursor: grab; }
         .col-info { flex: 1; padding: 0 15px; }
@@ -232,17 +246,17 @@
 
 <div class="main">
     <div class="top-bar">
-        <div>
-            <span style="font-weight: bold;">Status:</span> 
-            <span id="statusText" class="status">Waiting for PDF...</span>
+        <div class="view-controls">
+            <button class="view-btn active" id="viewHeatsBtn" onclick="switchView('heats')">Heats</button>
+            <button class="view-btn" id="viewRosterBtn" onclick="switchView('roster')">Roster</button>
         </div>
+        
+        <input type="text" id="rosterSearch" class="search-box" placeholder="Search Swimmers..." oninput="renderRoster()" style="display:none;">
+
         <div style="display:flex; align-items:center; gap:20px;">
             <button class="btn-stop-main" onclick="stopPlayback()">
                 🛑 STOP <span style="font-size:0.7rem; opacity:0.8;">(Esc)</span>
             </button>
-            <div style="font-size: 0.85rem; color: #64748b;">
-                <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
-            </div>
         </div>
     </div>
 
@@ -265,7 +279,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v44.0 (Stop + 4 Scripts)</div>
+        <div class="version-tag">v52.0 (Header Cleaner)</div>
     </div>
 </div>
 
@@ -303,21 +317,19 @@
 <script>
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
-    let currentAudioObject = null; // Track playing audio for Stop feature
+    let currentAudioObject = null;
+    let viewMode = 'heats'; 
 
-    // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
 
-    // --- CLEAN KEY INPUT ---
     function cleanInput(str) {
         if (!str) return "";
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     }
 
     window.onload = () => {
-        // Init Keys
         if(localStorage.getItem('openai_key')) {
             document.getElementById('apiKey').value = localStorage.getItem('openai_key');
             document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
@@ -328,18 +340,15 @@
         }
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
-        // Init Engine
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
         document.getElementById('engineSelect').value = savedEngine;
         updateVoiceOptions();
 
-        // Init Dict
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
-        // Load Session
         if(localStorage.getItem('saved_heats')) loadSession();
         else loadTemplateUI();
         
@@ -347,7 +356,6 @@
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
-    // --- VOICE OPTIONS ---
     const VOICES_OPENAI = [
         {id:'nova', name:'Nova (Energetic)'}, 
         {id:'onyx', name:'Onyx (Announcer)'}, 
@@ -367,12 +375,9 @@
         const select = document.getElementById('voiceSelect');
         const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
-        
-        // Show Custom Voice Field if ElevenLabs
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
 
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
-        
         list.forEach(v => {
             const opt = document.createElement('option');
             opt.value = v.id;
@@ -388,7 +393,6 @@
         localStorage.setItem('engine_pref', engine);
     }
 
-    // --- SESSION ---
     function saveSession() {
         localStorage.setItem('saved_heats', JSON.stringify(heats));
         localStorage.setItem('saved_order', JSON.stringify(heatOrder));
@@ -398,7 +402,7 @@
         try {
             heats = JSON.parse(localStorage.getItem('saved_heats'));
             heatOrder = JSON.parse(localStorage.getItem('saved_order'));
-            if(heats && heatOrder) { renderBoard(); setStatus("Restored previous session.", "ready"); }
+            if(heats && heatOrder) switchView('heats');
         } catch(e) { console.error(e); }
         loadTemplateUI();
     }
@@ -431,7 +435,6 @@
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
-    // --- TEMPLATES (ADDED 4TH OPTION) ---
     const defaultTemplates = { 
         1: "In lane {lane}, representing {team}, {name}.", 
         2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
@@ -485,28 +488,64 @@
         return text;
     }
 
-    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
+        if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+            alert("⚠️ iPhone HEIC photos are not supported. Please convert to JPG.");
+            input.value = ''; return;
+        }
         setStatus("Processing File...", "working");
-        const type = file.type.toLowerCase();
-        
-        if (type === "application/pdf") handlePdf(file);
-        else if (type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
+        if (file.type === "application/pdf") handlePdf(file);
+        else if (file.type.startsWith("image/")) handleImage(file);
+        else alert("Please upload PDF, JPG, or PNG.");
+    }
+
+    async function processImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imgData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        data[i] = data[i + 1] = data[i + 2] = avg > 128 ? 255 : 0; 
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
     }
 
     async function handleImage(file) {
-        setStatus("Scanning Image (OCR)...", "working");
+        setStatus("Optimizing Image...", "working");
         try {
-            const worker = await Tesseract.createWorker('eng');
-            const ret = await worker.recognize(file);
+            const cleanDataUrl = await processImage(file);
+            setStatus("Scanning Photo...", "working");
+            const worker = await Tesseract.createWorker('eng', 1, {
+                logger: m => {
+                    if(m.status === 'recognizing text') {
+                        const pct = Math.round(m.progress * 100);
+                        document.getElementById('progressBar').style.display = 'block';
+                        document.getElementById('progressFill').style.width = `${pct}%`;
+                    }
+                }
+            });
+            const ret = await worker.recognize(cleanDataUrl);
             await worker.terminate();
+            document.getElementById('progressBar').style.display = 'none';
             document.getElementById('dataInput').value = ret.data.text;
-            const count = manualParse(true);
-            if(count === 0) { setStatus("OCR Failed. Check Debug.", "error"); alert("OCR failed."); }
-            else setStatus(`Found ${count} swimmers.`, "ready");
+            manualParse(true);
         } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
     }
 
@@ -532,85 +571,81 @@
                 fullText += lines.join("\n") + "\n";
             }
             document.getElementById('dataInput').value = fullText;
-            const count = manualParse(true); 
-            if(count === 0) { setStatus("Auto-parse failed. Check Debug.", "error"); alert("Auto-parse failed."); }
-            else setStatus(`Found ${count} swimmers.`, "ready");
+            manualParse(true); 
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER ---
+    // --- PARSER V52 (CLEAN TITLES) ---
     function manualParse(silent = false) {
         try {
             const raw = document.getElementById('dataInput').value;
             const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
             let parsedData = [];
-            let currentEvent = "Unknown";
-            let currentEventName = "";
-            let currentHeat = null;
+            let currentEvent = "Unknown", currentEventName = "", currentHeat = null;
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
+                
+                // 1. CLEAN TITLE DETECTION
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
-                    let rawName = evtMatch[2].replace(/^[-–—]\s*/, "").replace(/["',]/g, "").trim();
-                    if (rawName.length > 3 && !rawName.match(/Lane|Heat|Name/i)) currentEventName = rawName;
+                    
+                    // TITLE CLEANER: Remove dangling names/times from event title
+                    // Example: "Girls 11-12 50 Free 1 Lilly P Davidson" -> "Girls 11-12 50 Free"
+                    let cleanName = evtMatch[2]
+                        .replace(/\s\d+\s+[A-Z].*/i, "") // Remove " 1 Name..."
+                        .replace(/\s\d+:\d+\.\d+/, "") // Remove times
+                        .replace(/^[-–—]\s*/, "")
+                        .replace(/["',]/g, "").trim();
+
+                    if (cleanName.length > 3) currentEventName = cleanName;
+                    
+                    currentHeat = null; // Reset heat on new event
+                    continue; 
                 } 
-                else {
-                    const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
-                    if(shortEvt) {
-                        currentEvent = shortEvt[1];
-                        for(let j=1; j<=2; j++) {
-                            if (i+j < lines.length) {
-                                let nextLine = lines[i+j].trim();
-                                if (nextLine.length > 3 && !nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
-                                    currentEventName = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "").trim();
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
 
+                // 2. HEAT DETECTION (Strict Boundary)
                 const hMatch = line.match(/Heat\s+(\d+)/i);
-                if(hMatch) currentHeat = hMatch[1];
-                if(line.includes("Alternates")) currentHeat = null;
-
-                let m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
-                let mode = "heat";
-                if(!m) {
-                    m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+.*([\d:.]+)$/i);
-                    mode = "result";
+                if(hMatch) {
+                    currentHeat = hMatch[1];
+                    continue;
                 }
 
-                if(m && (currentHeat || mode === "result")) {
+                // 3. SWIMMER PARSING
+                let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+)($|\s)/);
+                if(!m) m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+.*(XNT|NT|nt|[:\d\.]+)$/);
+
+                if(m) {
+                    if(!currentHeat) currentHeat = "1";
+
                     let rawName = m[2].trim();
-                    let rawTeam = m[4].trim().replace(/-[A-Z]{2}$/, "");
+                    let rawTeam = m[4].trim();
+                    
+                    // Safety: Ensure Name isn't part of a header (e.g. "Heat 2")
+                    if(rawName.toLowerCase().includes("heat")) continue;
+
                     if (nameFormat === 'last_first' && rawName.includes(',')) {
                         const parts = rawName.split(',');
-                        if(parts.length >= 2) {
-                            let last = parts[0].trim();
-                            let first = parts[1].trim().replace(/\s+[A-Z]\.?$/, "");
-                            rawName = `${first} ${last}`;
-                        }
+                        if(parts.length >= 2) rawName = `${parts[1].trim()} ${parts[0].trim()}`;
                     }
-                    if(mode === "result" && !currentHeat) currentHeat = "1";
 
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                    const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
+                    const displayTitle = `Event ${currentEvent} - Heat ${currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
                     
                     parsedData.push({ 
                         heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
                         heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
-                        time: (mode==="heat" ? m[5] : m[5]).toUpperCase()
+                        time: m[5].toUpperCase()
                     });
                 }
             }
             
             if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
 
-            if (!heats || Object.keys(heats).length === 0 || confirm("Overwrite current list?")) {
+            const doOverwrite = (!heats || Object.keys(heats).length === 0 || confirm("Found swimmers. Overwrite current list?"));
+            if (doOverwrite) {
                 heats = {}; heatOrder = [];
                 parsedData.forEach(s => {
                     if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
@@ -618,7 +653,8 @@
                 });
                 heatOrder.sort(); 
                 saveSession();
-                renderBoard();
+                setStatus(`Loaded ${parsedData.length} swimmers.`, "ready");
+                switchView('heats'); 
             }
             return parsedData.length;
         } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
@@ -729,72 +765,99 @@
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
-        
-        // Custom Voice ID Logic
-        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
-        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
-
-        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
-        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
-
         const btn = document.getElementById('btnGenerate');
-        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
-        const template = document.getElementById('modalTemplateInput').value; 
-        const introTemplate = document.getElementById('introScriptInput').value;
-        const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-        const voice = document.getElementById('voiceSelect').value;
-        const forceRegen = document.getElementById('forceRegen').checked;
-        const queue = [];
         
-        for (const heatKey of heatOrder) {
-            const group = heats[heatKey];
-            const hId = `h_${heatKey}`;
+        try {
+            const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+            let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
+
+            if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+            if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+
+            // Safe Dictionary Parse
+            let dict = {};
+            try {
+                dict = JSON.parse(document.getElementById('dictInput').value || "{}");
+            } catch(e) {
+                alert("Dictionary Error: Invalid JSON. Please fix syntax.");
+                return; 
+            }
+
+            btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+            const template = document.getElementById('modalTemplateInput').value; 
+            const introTemplate = document.getElementById('introScriptInput').value;
+            const voice = document.getElementById('voiceSelect').value;
+            const forceRegen = document.getElementById('forceRegen').checked;
+            const queue = [];
             
-            if (forceRegen || !audioCache[hId]) {
-                let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
-                introText = applyHype(introText);
-                queue.push({ id: hId, text: introText });
-            }
-            for (const s of group.swimmers) {
-                if(s.scratched) continue;
-                if (forceRegen || !audioCache[s.id]) {
-                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-                    let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
-                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                    txt = applyHype(txt);
-                    queue.push({ id: s.id, text: txt });
+            for (const heatKey of heatOrder) {
+                const group = heats[heatKey];
+                // Safety: Skip empty groups
+                if (!group.swimmers || group.swimmers.length === 0) continue;
+
+                const hId = `h_${heatKey}`;
+                
+                if (forceRegen || !audioCache[hId]) {
+                    let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+                    introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                    introText = applyHype(introText);
+                    queue.push({ id: hId, text: introText });
+                }
+                for (const s of group.swimmers) {
+                    if(s.scratched) continue;
+                    if (forceRegen || !audioCache[s.id]) {
+                        let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                        let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+                        let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
+                        for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+                        txt = applyHype(txt);
+                        queue.push({ id: s.id, text: txt });
+                    }
                 }
             }
-        }
 
-        const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
-        
-        let completed = 0; const total = queue.length;
-        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
-        setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
-
-        async function worker() {
-            while (queue.length > 0) {
-                const task = queue.shift();
-                try {
-                    let res = null;
-                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                    else res = await fetchOpenAI(task.text, voice, oaKey);
-                    
-                    if(res) audioCache[task.id] = res;
-                } catch(e) { 
-                    console.error(e); 
-                    alert(`API Error: ${e.message}`);
-                }
-                completed++;
-                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+            const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+            
+            let completed = 0; const total = queue.length;
+            if (total === 0) { 
+                setStatus("Nothing new to generate.", "ready"); 
+                return; 
             }
+            
+            setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
+
+            async function worker() {
+                while (queue.length > 0) {
+                    const task = queue.shift();
+                    try {
+                        let res = null;
+                        if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                        else res = await fetchOpenAI(task.text, voice, oaKey);
+                        
+                        if(res) audioCache[task.id] = res;
+                    } catch(e) { 
+                        console.error(e); 
+                        alert(`API Error: ${e.message}`);
+                    }
+                    completed++;
+                    document.getElementById('progressFill').style.width = (completed/total*100)+"%";
+                }
+            }
+            const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+            await Promise.all(workers);
+            
+            setStatus("Audio Ready.", "ready");
+            if(viewMode === 'heats') renderBoard();
+            else renderRoster();
+
+        } catch (err) {
+            console.error(err);
+            alert("Crash Prevented: " + err.message);
+        } finally {
+            // ALWAYS reset button
+            btn.disabled = false; 
+            btn.innerText = "⚡ GENERATE AUDIO"; 
         }
-        const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
-        await Promise.all(workers);
-        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
     async function fetchOpenAI(text, voice, key) {
@@ -821,7 +884,6 @@
         return new Audio(URL.createObjectURL(await r.blob()));
     }
 
-    // --- STOP PLAYBACK ---
     function stopPlayback() {
         if(currentAudioObject) {
             currentAudioObject.pause();
@@ -832,13 +894,14 @@
     }
 
     function triggerGo() {
+        if(viewMode !== 'heats') return; 
         const { heat, index } = currentSelection;
         if(heat === null) { if(heatOrder.length > 0) selectCue(heatOrder[0], -1); else return; }
         playSelection(); navigate(1);
     }
 
     function playSelection() {
-        stopPlayback(); // Auto-stop previous
+        stopPlayback(); 
         const { heat, index } = currentSelection;
         let aud = null; let msg = "";
         if(index === -1) { aud = audioCache[`h_${heat}`]; msg = `Announcing ${heats[heat].title}...`; }
@@ -861,6 +924,7 @@
     });
 
     function navigate(dir) {
+        if(viewMode !== 'heats') return; 
         let flatMap = [];
         heatOrder.forEach(h => { flatMap.push({ heat: h, index: -1 }); heats[h].swimmers.forEach((s, i) => { if(!s.scratched) flatMap.push({ heat: h, index: i }); }); });
         let currIdx = flatMap.findIndex(x => x.heat === currentSelection.heat && x.index === currentSelection.index);
