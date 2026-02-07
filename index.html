@@ -2,18 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v34 (Safety Net)</title>
+    <title>Swim Announcer Ultimate v35 (ElevenLabs + OpenAI)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V20 CSS BASE --- */
+        /* --- STABLE V20 LAYOUT ENGINE --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* SIDEBAR */
         .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 50; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
@@ -175,14 +174,15 @@
             </div>
 
             <div>
-                <label>3. Voice & Hype</label>
-                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
-                    <option value="nova">Nova (Energetic) 🔥</option>
-                    <option value="onyx">Onyx (Announcer) 🎙️</option>
-                    <option value="alloy">Alloy (Balanced)</option>
-                    <option value="echo">Echo (Soft)</option>
-                    <option value="shimmer">Shimmer (Clear)</option>
+                <label>3. Voice Engine</label>
+                <select id="engineSelect" onchange="updateVoiceOptions()" style="margin-bottom:10px;">
+                    <option value="openai">OpenAI (Default)</option>
+                    <option value="elevenlabs">ElevenLabs (Best Quality)</option>
                 </select>
+
+                <label>Voice Model</label>
+                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
+                    </select>
 
                 <div class="slider-group">
                     <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
@@ -194,6 +194,7 @@
 
         <div id="viewSettings" class="view-section">
             <div><label>OpenAI API Key</label><input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()"></div>
+            <div><label>ElevenLabs API Key</label><input type="password" id="elevenKey" placeholder="xi-..." onchange="saveConfig()"></div>
             <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea></div>
             <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea></div>
         </div>
@@ -237,9 +238,10 @@
     <div class="modal-content">
         <div class="modal-header"><div class="modal-title">⚙️ SETTINGS</div><button class="close-btn" onclick="toggleSettings()">&times;</button></div>
         <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
+        <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v34.0 (Safety Net)</div>
+        <div class="version-tag">v35.0 (Dual Engine)</div>
     </div>
 </div>
 
@@ -252,7 +254,7 @@
             <button class="tab-btn" id="modalTab3" onclick="switchTab(3)">3. Results</button>
         </div>
         <label>EVENT INTRO SCRIPT</label>
-        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()"></textarea>
+        <textarea id="introScriptInput" style="height:60px; font-size:1rem; line-height:1.4; padding:10px; margin-bottom:15px;" oninput="syncScript()">Now swimming {event_title}.</textarea>
         <label>SWIMMER SCRIPT</label>
         <textarea id="modalTemplateInput" style="height:150px; font-size:1.1rem; line-height:1.5; padding:15px;" oninput="syncScript()"></textarea>
         <div style="margin-top:10px;">
@@ -283,31 +285,80 @@
     };
 
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) { document.getElementById('apiKey').value = localStorage.getItem('openai_key'); document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key'); }
-        if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
+        // Init API Keys
+        if(localStorage.getItem('openai_key')) {
+            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
+            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
+        }
+        if(localStorage.getItem('eleven_key')) {
+            document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
+            document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
+        }
         
+        // Init Engine Select
+        const savedEngine = localStorage.getItem('engine_pref') || 'openai';
+        document.getElementById('engineSelect').value = savedEngine;
+        updateVoiceOptions();
+
+        // Init Dictionary
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
-        // LOAD SESSION IF EXISTS
-        if(localStorage.getItem('saved_heats')) {
-            loadSession();
-        } else {
-            loadTemplateUI();
-        }
+        // Load Session
+        if(localStorage.getItem('saved_heats')) loadSession();
+        else loadTemplateUI();
         
         updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
 
+    // --- VOICE OPTIONS (OPENAI vs ELEVENLABS) ---
+    const VOICES_OPENAI = [
+        {id:'nova', name:'Nova (Energetic)'},
+        {id:'onyx', name:'Onyx (Announcer)'},
+        {id:'alloy', name:'Alloy (Balanced)'},
+        {id:'echo', name:'Echo (Soft)'},
+        {id:'shimmer', name:'Shimmer (Clear)'}
+    ];
+    // Specific High-Quality ElevenLabs Voices (IDs are public/popular)
+    const VOICES_ELEVEN = [
+        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
+        {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
+        {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
+        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'},
+        {id:'cgSgspJ2msm6clMCkdW9', name:'Jessica (News)'}
+    ];
+
+    function updateVoiceOptions() {
+        const engine = document.getElementById('engineSelect').value;
+        const select = document.getElementById('voiceSelect');
+        select.innerHTML = "";
+        
+        const list = engine === 'elevenlabs' ? VOICES_ELEVEN : VOICES_OPENAI;
+        list.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.id;
+            opt.innerText = v.name;
+            select.appendChild(opt);
+        });
+        
+        // Restore saved voice preference if possible
+        const savedVoice = localStorage.getItem('voice_id_pref');
+        if(savedVoice) {
+            // Check if saved voice exists in current list
+            const exists = list.find(v => v.id === savedVoice);
+            if(exists) select.value = savedVoice;
+        }
+        
+        localStorage.setItem('engine_pref', engine);
+    }
+
     // --- SESSION MANAGEMENT ---
     function saveSession() {
         localStorage.setItem('saved_heats', JSON.stringify(heats));
         localStorage.setItem('saved_order', JSON.stringify(heatOrder));
-        // Note: Audio blobs cannot be saved to localStorage effectively, 
-        // user will need to re-generate if cache cleared, but text is safe.
         setStatus("Session Saved.", "ready");
     }
 
@@ -337,8 +388,19 @@
         document.getElementById('dataInputModal').value = document.getElementById('dataInput').value;
     }
 
-    function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
-    function saveConfigFromModal() { const key = document.getElementById('apiKeyModal').value; document.getElementById('apiKey').value = key; localStorage.setItem('openai_key', key); }
+    function saveConfig() { 
+        localStorage.setItem('openai_key', document.getElementById('apiKey').value); 
+        localStorage.setItem('eleven_key', document.getElementById('elevenKey').value); 
+        localStorage.setItem('voice_id_pref', document.getElementById('voiceSelect').value);
+    }
+    function saveConfigFromModal() { 
+        const oaKey = document.getElementById('apiKeyModal').value; 
+        const xiKey = document.getElementById('elevenKeyModal').value;
+        document.getElementById('apiKey').value = oaKey; 
+        document.getElementById('elevenKey').value = xiKey;
+        localStorage.setItem('openai_key', oaKey);
+        localStorage.setItem('eleven_key', xiKey);
+    }
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
@@ -510,8 +572,6 @@
             
             if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
 
-            // Merge if restoring, or overwrite? Overwrite for now, but in future could merge.
-            // For now, if we parse, we assume new file.
             if (!heats || Object.keys(heats).length === 0 || confirm("Overwrite current list?")) {
                 heats = {}; heatOrder = [];
                 parsedData.forEach(s => {
@@ -519,7 +579,7 @@
                     heats[s.heatId].swimmers.push({ ...s, scratched: false, id: `s_${s.heatId}_${s.lane}` });
                 });
                 heatOrder.sort(); 
-                saveSession(); // SAVE!
+                saveSession();
                 renderBoard();
             }
             return parsedData.length;
@@ -539,7 +599,6 @@
             const heatBlock = document.createElement('div');
             heatBlock.className = 'heat-block';
             
-            // Header
             let headerText = group.title;
             const header = document.createElement('div');
             header.className = 'heat-header';
@@ -564,7 +623,6 @@
                 heatBlock.appendChild(row);
             });
             
-            // Manual Add Button
             const addBtn = document.createElement('button');
             addBtn.className = 'btn-add-swimmer';
             addBtn.innerText = "+ Add Swimmer";
@@ -576,12 +634,8 @@
     }
 
     function addSwimmer(heatKey) {
-        const s = { 
-            heatId: heatKey, event: "?", heat: "?", lane: "9", name: "New Swimmer", team: "Team", time: "NT", scratched: false, id: `s_${heatKey}_${Date.now()}` 
-        };
-        heats[heatKey].swimmers.push(s);
-        saveSession();
-        renderBoard();
+        const s = { heatId: heatKey, event: "?", heat: "?", lane: "9", name: "New Swimmer", team: "Team", time: "NT", scratched: false, id: `s_${heatKey}_${Date.now()}` };
+        heats[heatKey].swimmers.push(s); saveSession(); renderBoard();
     }
 
     let dragSrc = null;
@@ -629,14 +683,19 @@
     }
 
     function getOrdinal(n) {
-        let s = ["th", "st", "nd", "rd"];
-        let v = n % 100;
+        let s = ["th", "st", "nd", "rd"]; let v = n % 100;
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
     }
 
     async function generateAudio() {
-        const key = document.getElementById('apiKey').value;
-        if(!key.startsWith('sk-')) { alert("Missing API Key. Check Settings."); toggleSettings(); return; }
+        // Validation based on Engine
+        const engine = document.getElementById('engineSelect').value;
+        const oaKey = document.getElementById('apiKey').value;
+        const xiKey = document.getElementById('elevenKey').value;
+
+        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key."); toggleSettings(); return; }
+        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
         const template = document.getElementById('modalTemplateInput').value; 
@@ -676,7 +735,10 @@
             while (queue.length > 0) {
                 const task = queue.shift();
                 try {
-                    const res = await fetchAI(task.text, voice, key);
+                    let res = null;
+                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voice, xiKey);
+                    else res = await fetchOpenAI(task.text, voice, oaKey);
+                    
                     if(res) audioCache[task.id] = res;
                 } catch(e) { console.error(e); }
                 completed++;
@@ -688,8 +750,16 @@
         btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
-    async function fetchAI(text, voice, key) {
+    async function fetchOpenAI(text, voice, key) {
         const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: 1.0 }) });
+        if(r.ok) return new Audio(URL.createObjectURL(await r.blob())); return null;
+    }
+
+    async function fetchEleven(text, voiceId, key) {
+        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+            method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json" },
+            body: JSON.stringify({ text: text, model_id: "eleven_monolingual_v1", voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+        });
         if(r.ok) return new Audio(URL.createObjectURL(await r.blob())); return null;
     }
 
