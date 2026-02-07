@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v10 (QLab Style)</title>
+    <title>Swim Announcer Ultimate v11 (NT Support)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -97,7 +97,7 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate v10 (QLab)</h2>
+        <h2>🏊 Ultimate v11 (Fixed)</h2>
     </div>
     
     <div class="scroll-area">
@@ -253,10 +253,10 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER (V10) ---
+    // --- PARSER (V11 - NT SUPPORT) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
-        const nameFormat = document.getElementById('nameFormatSelect').value; // last_first OR first_last
+        const nameFormat = document.getElementById('nameFormatSelect').value; 
         const lines = raw.split('\n');
         let parsedData = [];
         let currentEvent = "Unknown";
@@ -271,32 +271,28 @@
             if(line.includes("Alternates")) currentHeat = null;
 
             if(currentHeat) {
-                // Regex: Lane(1-2) Name(text) Age(1-2) Team(text) Time(dec)
-                const m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(\d{1,2}[:\.]\d{2})/);
+                // Regex Change: Time group now accepts "NT" or digits/colons
+                // Pattern: Lane(1-2) Name(text) Age(1-2) Team(text) Time(NT or 24.59)
+                const m = line.match(/^\s*(\d{1,2})\s+([A-Za-z, \.-]+?)\s+(\d{1,2})\s+([A-Za-z0-9\s\.-]+?)\s+(NT|nt|[\d:.]+)($|\s)/i);
+                
                 if(m) {
                     let rawName = m[2].trim();
                     let rawTeam = m[4].trim();
 
-                    // 1. Clean Team (Remove -IL)
+                    // Clean Team
                     rawTeam = rawTeam.replace(/-[A-Z]{2}$/, "");
 
-                    // 2. Handle Name Format
+                    // Clean Name
                     if (nameFormat === 'last_first') {
-                        // "Shen, Esmae Z" -> "Esmae Shen"
                         if (rawName.includes(',')) {
                             const parts = rawName.split(',');
                             if(parts.length >= 2) {
                                 let last = parts[0].trim();
                                 let first = parts[1].trim();
-                                // Remove Middle Initial from First Name
                                 first = first.replace(/\s+[A-Z]\.?$/, "");
                                 rawName = `${first} ${last}`;
                             }
                         }
-                    } else {
-                         // "Esmae Z Shen" -> "Esmae Shen" (Simple middle init removal)
-                         // This is trickier, simplified here to just remove trailing single chars if present
-                         // For now, assume First Last is clean or manually editable
                     }
 
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
@@ -311,7 +307,7 @@
                         name: rawName, 
                         age: m[3],
                         team: rawTeam, 
-                        time: m[5] 
+                        time: m[5].toUpperCase() // "nt" -> "NT"
                     });
                 }
             }
@@ -467,19 +463,13 @@
         return null;
     }
 
-    // --- QLAB TRIGGER LOGIC ---
     function triggerGo() {
         const { heat, index } = currentSelection;
         if(heat === null) {
-            // Start at first heat
             if(heatOrder.length > 0) selectCue(heatOrder[0], -1);
             else return;
         }
-
-        // 1. Play Current Audio
         playSelection();
-
-        // 2. Auto-Advance Selection (Prepare Next Cue)
         navigate(1);
     }
 
@@ -489,11 +479,9 @@
         let msg = "";
 
         if(index === -1) {
-            // Play Heat Intro
             aud = audioCache[`h_${heat}`];
             msg = `Announcing ${heats[heat].title}...`;
         } else {
-            // Play Swimmer
             const s = heats[heat].swimmers[index];
             if(!s.scratched) {
                 aud = audioCache[s.id];
