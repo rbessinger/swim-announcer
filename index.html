@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v52 (Header Fix)</title>
+    <title>Swim Announcer Ultimate v53 (AI Parser Added)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V52 LAYOUT --- */
+        /* --- STABLE V53 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -61,6 +61,9 @@
 
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
+
+        .ai-toggle-box { background: #1e1b4b; border: 1px solid #4f46e5; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .ai-badge { background: linear-gradient(90deg, #4f46e5, #ec4899); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; margin-left: 5px; }
 
         /* MAIN DASHBOARD */
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
@@ -166,6 +169,16 @@
     <div class="scroll-area">
         
         <div id="viewMain" class="view-section active">
+            <div class="ai-toggle-box">
+                <label class="checkbox-row" style="margin-bottom:0;">
+                    <input type="checkbox" id="useAiParser" onchange="toggleAiParser()">
+                    <span style="color:white; font-size:0.9rem;">Enable AI Parser <span class="ai-badge">SMART</span></span>
+                </label>
+                <div style="font-size:0.7rem; color:#94a3b8; margin-top:5px; margin-left:24px;">
+                    Sends file text to OpenAI for perfect extraction. Slower but accurate.
+                </div>
+            </div>
+
             <div>
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box">
@@ -175,7 +188,7 @@
                 </label>
             </div>
 
-            <div>
+            <div id="manualFormatDiv">
                 <label>Name Format</label>
                 <select id="nameFormatSelect" onchange="manualParse()">
                     <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
@@ -279,7 +292,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v52.0 (Header Cleaner)</div>
+        <div class="version-tag">v53.0 (AI Parser Added)</div>
     </div>
 </div>
 
@@ -327,6 +340,11 @@
     function cleanInput(str) {
         if (!str) return "";
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    }
+
+    function toggleAiParser() {
+        const useAi = document.getElementById('useAiParser').checked;
+        document.getElementById('manualFormatDiv').style.display = useAi ? 'none' : 'block';
     }
 
     window.onload = () => {
@@ -497,7 +515,7 @@
         }
         setStatus("Processing File...", "working");
         if (file.type === "application/pdf") handlePdf(file);
-        else if (file.type.startsWith("image/")) handleImage(file);
+        else if (type.startsWith("image/")) handleImage(file);
         else alert("Please upload PDF, JPG, or PNG.");
     }
 
@@ -545,8 +563,12 @@
             await worker.terminate();
             document.getElementById('progressBar').style.display = 'none';
             document.getElementById('dataInput').value = ret.data.text;
-            manualParse(true);
-        } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
+            
+            // Check AI Mode
+            if(document.getElementById('useAiParser').checked) await parseWithAI(ret.data.text);
+            else manualParse(true);
+
+        } catch(e) { console.error(e); setStatus("OCR Error.", "error"); alert("Photo Error: " + e.message); }
     }
 
     async function handlePdf(file) {
@@ -571,12 +593,96 @@
                 fullText += lines.join("\n") + "\n";
             }
             document.getElementById('dataInput').value = fullText;
-            manualParse(true); 
+            
+            // Check AI Mode
+            if(document.getElementById('useAiParser').checked) await parseWithAI(fullText);
+            else manualParse(true);
+
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER V52 (CLEAN TITLES) ---
+    // --- AI PARSING ENGINE ---
+    async function parseWithAI(rawText) {
+        const key = cleanInput(document.getElementById('apiKey').value);
+        if(!key.startsWith('sk-')) { alert("AI Parser requires a valid OpenAI API Key."); return; }
+        
+        setStatus("Sending to AI (This takes ~10s)...", "working");
+        
+        const systemPrompt = `You are a data extractor for swimming heat sheets. 
+        Extract data into this JSON format:
+        [
+          {
+            "heatId": "E1-H1",
+            "heatTitle": "Event 1 - Heat 1 (Boys 50 Free)",
+            "event": "1",
+            "eventName": "Boys 50 Free",
+            "heat": "1",
+            "swimmers": [
+               { "lane": "4", "name": "John Doe", "team": "ACME", "age": "12", "time": "23.45" }
+            ]
+          }
+        ]
+        - Group by Heats.
+        - Handle sideways text or messy OCR.
+        - 'XNT' and 'NT' are valid times.
+        - Ignore header junk.
+        - Return ONLY JSON.`;
+
+        try {
+            const r = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini", // Cheap and fast
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: rawText }
+                    ],
+                    temperature: 0
+                })
+            });
+            
+            const json = await r.json();
+            if(json.error) throw new Error(json.error.message);
+            
+            let content = json.choices[0].message.content;
+            // Strip markdown code blocks if AI adds them
+            content = content.replace(/```json/g, "").replace(/```/g, "");
+            
+            const parsedData = JSON.parse(content);
+            
+            // Convert AI format to internal format
+            heats = {}; heatOrder = [];
+            parsedData.forEach(h => {
+                if(!heats[h.heatId]) { heats[h.heatId] = { title: h.heatTitle, swimmers: [] }; heatOrder.push(h.heatId); }
+                h.swimmers.forEach(s => {
+                    heats[h.heatId].swimmers.push({ 
+                        ...s, 
+                        heatId: h.heatId,
+                        event: h.event,
+                        eventName: h.eventName,
+                        heat: h.heat,
+                        scratched: false, 
+                        id: `s_${h.heatId}_${s.lane}` 
+                    });
+                });
+            });
+            
+            saveSession();
+            setStatus(`AI Found ${heatOrder.length} Heats.`, "ready");
+            switchView('heats');
+
+        } catch(e) {
+            console.error(e);
+            alert("AI Parse Failed: " + e.message + "\n\nFalling back to manual parser.");
+            manualParse(true);
+        }
+    }
+
+    // --- MANUAL PARSER V52 (Backup) ---
     function manualParse(silent = false) {
+        if(document.getElementById('useAiParser').checked) return; // Don't run if AI is on
+
         try {
             const raw = document.getElementById('dataInput').value;
             const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -587,43 +693,29 @@
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
                 
-                // 1. CLEAN TITLE DETECTION
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
-                    
-                    // TITLE CLEANER: Remove dangling names/times from event title
-                    // Example: "Girls 11-12 50 Free 1 Lilly P Davidson" -> "Girls 11-12 50 Free"
                     let cleanName = evtMatch[2]
-                        .replace(/\s\d+\s+[A-Z].*/i, "") // Remove " 1 Name..."
-                        .replace(/\s\d+:\d+\.\d+/, "") // Remove times
+                        .replace(/\s\d+\s+[A-Z].*/i, "") 
+                        .replace(/\s\d+:\d+\.\d+/, "") 
                         .replace(/^[-–—]\s*/, "")
                         .replace(/["',]/g, "").trim();
 
                     if (cleanName.length > 3) currentEventName = cleanName;
-                    
-                    currentHeat = null; // Reset heat on new event
+                    currentHeat = null; 
                     continue; 
                 } 
 
-                // 2. HEAT DETECTION (Strict Boundary)
                 const hMatch = line.match(/Heat\s+(\d+)/i);
-                if(hMatch) {
-                    currentHeat = hMatch[1];
-                    continue;
-                }
+                if(hMatch) { currentHeat = hMatch[1]; continue; }
 
-                // 3. SWIMMER PARSING
                 let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+)($|\s)/);
                 if(!m) m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+.*(XNT|NT|nt|[:\d\.]+)$/);
 
                 if(m) {
                     if(!currentHeat) currentHeat = "1";
-
                     let rawName = m[2].trim();
-                    let rawTeam = m[4].trim();
-                    
-                    // Safety: Ensure Name isn't part of a header (e.g. "Heat 2")
                     if(rawName.toLowerCase().includes("heat")) continue;
 
                     if (nameFormat === 'last_first' && rawName.includes(',')) {
@@ -636,7 +728,7 @@
                     
                     parsedData.push({ 
                         heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
-                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: rawTeam, 
+                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: m[4].trim(), 
                         time: m[5].toUpperCase()
                     });
                 }
