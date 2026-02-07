@@ -2,19 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v30 (Stable Dictionary)</title>
+    <title>Swim Announcer Ultimate v31 (Restored)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE LAYOUT ENGINE --- */
+        /* --- STABLE FLEXBOX LAYOUT (Based on v28) --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
         /* SIDEBAR */
-        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 100; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 20; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
@@ -114,29 +114,17 @@
         .btn-go:active { transform: scale(0.95); background: #15803d; }
         .go-label { font-size: 0.8rem; font-weight: normal; opacity: 0.8; margin-top: -5px; }
 
-        /* MODAL */
-        .modal-overlay { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; 
-        }
+        /* MODALS */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; }
-        .modal-content { 
-            background: #0f172a; width: 700px; padding: 30px; border-radius: 12px; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; 
-            color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative;
-        }
+        .modal-content { background: #0f172a; width: 700px; padding: 30px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; color: #94a3b8; display: flex; flex-direction: column; gap: 20px; position: relative; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
         .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
         .close-btn:hover { color: white; }
         .version-tag { position: absolute; bottom: 15px; right: 20px; font-size: 0.7rem; color: #334155; font-family: monospace; }
-
         .var-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-        .var-chip { 
-            background: #1e293b; color: var(--accent); border: 1px solid #334155; 
-            padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-family: monospace; 
-            cursor: pointer; transition: 0.2s; font-weight: bold; 
-        }
+        .var-chip { background: #1e293b; color: var(--accent); border: 1px solid #334155; padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-family: monospace; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .var-chip:hover { background: var(--accent); color: white; border-color: var(--accent); }
 
     </style>
@@ -201,24 +189,10 @@
         </div>
 
         <div id="viewSettings" class="view-section">
-            <div>
-                <label>OpenAI API Key</label>
-                <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
-                <div style="font-size:0.65rem; color:#64748b; margin-top:5px;">Key is saved to your browser cache.</div>
-            </div>
-            
-            <div>
-                <label>Phonetic Dictionary</label>
-                <textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea>
-            </div>
-
-            <div>
-                <label style="color:var(--orange);">Raw Data (Debug)</label>
-                <textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-                <button class="btn-parse" onclick="manualParse(); toggleSettings();">Force Parse Data</button>
-            </div>
+            <div><label>OpenAI API Key</label><input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()"></div>
+            <div><label>Phonetic Dictionary</label><textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()"></textarea></div>
+            <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea></div>
         </div>
-
     </div>
 
     <div class="action-area">
@@ -243,23 +217,10 @@
             <button class="close-btn" onclick="toggleSettings()">&times;</button>
         </div>
         
-        <div>
-            <label>OpenAI API Key</label>
-            <input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()">
-        </div>
-
-        <div>
-            <label>Phonetic Dictionary (JSON)</label>
-            <textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea>
-        </div>
-
-        <div>
-            <label style="color:var(--orange);">Raw Data (Debug)</label>
-            <textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-            <button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button>
-        </div>
-        
-        <div class="version-tag">v30.0 (Stable Dictionary)</div>
+        <div><label>OpenAI API Key</label><input type="password" id="apiKeyModal" placeholder="sk-..." onchange="saveConfigFromModal()"></div>
+        <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
+        <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
+        <div class="version-tag">v31.0 (Restored Core)</div>
     </div>
 </div>
 
@@ -302,63 +263,11 @@
 </div>
 
 <script>
-    let heats = {}; 
-    let heatOrder = []; 
-    let audioCache = {}; 
-    let currentSelection = { heat: null, index: -1 }; 
-    let isSettingsOpen = false;
-    let isScriptOpen = false;
+    let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
+    let isSettingsOpen = false; let isScriptOpen = false;
 
-    // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
-        "Nguyen": "Win",
-        "Xu": "Shoo",
-        "Zhang": "Jang",
-        "Wang": "Wong",
-        "Liu": "Leo",
-        "Chen": "Chen",
-        "Yang": "Young",
-        "Huang": "Hwong",
-        "Zhao": "Jow",
-        "Wu": "Woo",
-        "Zhou": "Joe",
-        "Muller": "Mew-ler",
-        "Schmidt": "Schmitt",
-        "Schneider": "Sh-nye-der",
-        "Fischer": "Fisher",
-        "Weber": "Vey-ber",
-        "Meyer": "My-er",
-        "Wagner": "Vog-ner",
-        "Becker": "Beck-er",
-        "Schulz": "Shults",
-        "Hoffmann": "Hoff-man",
-        "Ivanov": "Ee-van-off",
-        "Smirnov": "Smeer-noff",
-        "Kuznetsov": "Kooz-net-soff",
-        "Popov": "Pop-off",
-        "Sokolov": "So-ko-loff",
-        "Lebedev": "Leb-e-dev",
-        "Kozlov": "Koz-loff",
-        "Novikov": "No-vi-koff",
-        "Morozov": "More-o-zoff",
-        "Kowalski": "Ko-val-ski",
-        "Wisniewski": "Vis-nyev-ski",
-        "Wojcik": "Voy-chick",
-        "Kowalczyk": "Ko-val-chick",
-        "Kaminski": "Ka-min-ski",
-        "Lewandowski": "Lev-an-dow-ski",
-        "Zielinski": "Ziel-in-ski",
-        "Szymanski": "Shim-an-ski",
-        "Dabrowski": "Dab-row-ski",
-        "Jankovic": "Yan-ko-vich",
-        "Petrovic": "Pet-ro-vich",
-        "Nikolic": "Nee-ko-lich",
-        "Markovic": "Mar-ko-vich",
-        "Djordjevic": "Jor-jay-vich",
-        "Stojanovic": "Stoy-ya-no-vich",
-        "Ilic": "Ee-lich",
-        "Pavlovic": "Pav-lo-vich",
-        "Gavrilos": "Gah-vree-los"
+        "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
 
     window.onload = () => {
@@ -368,10 +277,8 @@
         }
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
         
-        // Load Dictionary (Merge Default if empty)
         let savedDict = localStorage.getItem('phonetic_dict');
         if(!savedDict) savedDict = JSON.stringify(MEGA_DICT, null, 2);
-        
         document.getElementById('dictInput').value = savedDict;
         document.getElementById('dictInputModal').value = savedDict;
 
@@ -391,16 +298,8 @@
     function saveDictFromModal() { const dict = document.getElementById('dictInputModal').value; document.getElementById('dictInput').value = dict; localStorage.setItem('phonetic_dict', dict); }
     function manualParseFromModal() { document.getElementById('dataInput').value = document.getElementById('dataInputModal').value; manualParse(); }
 
-    const defaultTemplates = { 
-        1: "In lane {lane}, representing {team}, {name}.", 
-        2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 
-        3: "In {place} place, with a time of {time}, from {team}, {name}." 
-    };
-    const defaultIntros = { 
-        1: "Now swimming {event_title}.", 
-        2: "Ladies and gentlemen, please welcome the finalists for {event_title}.", 
-        3: "And now, the results for {event_title}." 
-    };
+    const defaultTemplates = { 1: "In lane {lane}, representing {team}, {name}.", 2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.", 3: "In {place} place, with a time of {time}, from {team}, {name}." };
+    const defaultIntros = { 1: "Now swimming {event_title}.", 2: "Ladies and gentlemen, please welcome the finalists for {event_title}.", 3: "And now, the results for {event_title}." };
     let currentTab = 1;
 
     function switchTab(t) { 
@@ -442,7 +341,6 @@
         return text;
     }
 
-    // --- FILE HANDLING (NO HEIC) ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
@@ -451,7 +349,7 @@
         
         if (type === "application/pdf") handlePdf(file);
         else if (type.startsWith("image/")) handleImage(file);
-        else alert("Please upload PDF, JPG, or PNG.");
+        else alert("Please upload PDF, JPG, or PNG. (Convert HEIC to JPG first)");
     }
 
     async function handleImage(file) {
@@ -495,7 +393,6 @@
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- UNIVERSAL PARSER (V30) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -557,7 +454,7 @@
                 if(mode === "result" && !currentHeat) currentHeat = "1";
 
                 const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
-                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat}`;
+                const displayTitle = `Event ${currentEvent} - ${mode==="result"?"Results":"Heat "+currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
                 
                 parsedData.push({ 
                     heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
@@ -592,15 +489,9 @@
             const heatBlock = document.createElement('div');
             heatBlock.className = 'heat-block';
             
-            // Show Event Name in Header
-            let headerText = group.title;
-            if(group.swimmers[0].eventName) {
-                headerText = `Event ${group.swimmers[0].event} - ${group.swimmers[0].eventName} - Heat ${group.swimmers[0].heat}`;
-            }
-
             const header = document.createElement('div');
             header.className = 'heat-header';
-            header.innerHTML = `<div class="heat-title">${headerText}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
+            header.innerHTML = `<div class="heat-title">${group.title}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
             header.onclick = () => selectCue(heatKey, -1);
             if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
             heatBlock.appendChild(header);
@@ -668,7 +559,6 @@
         el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
     }
 
-    // --- ORDINAL HELPER (1st, 2nd, 3rd) ---
     function getOrdinal(n) {
         let s = ["th", "st", "nd", "rd"];
         let v = n % 100;
@@ -700,9 +590,7 @@
                 if(s.scratched) continue;
                 if (forceRegen || !audioCache[s.id]) {
                     let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-                    // Apply Ordinal Place (1 -> 1st)
                     let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-
                     let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
                     for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
                     txt = applyHype(txt);
