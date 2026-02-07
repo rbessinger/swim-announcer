@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v4 (Pro)</title>
+    <title>Swim Announcer Ultimate v5 (Multi-User)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -85,10 +85,15 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate Announcer v4</h2>
+        <h2>🏊 Ultimate Announcer v5</h2>
     </div>
     
     <div class="scroll-area">
+        <div>
+            <label>OpenAI API Key</label>
+            <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
+        </div>
+
         <div>
             <label>1. Upload Meet Program (PDF)</label>
             <label class="file-upload-box">
@@ -112,7 +117,7 @@
 
         <div>
             <label>3. Phonetic Dictionary (JSON)</label>
-            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">Edit code to perm-save. Format: "Name": "Sound"</div>
+            <div style="font-size:0.7rem; color:#64748b; margin-bottom:5px;">Format: "Name": "Sound"</div>
             <textarea id="dictInput" style="height:80px; font-family:monospace; font-size:0.75rem;">
 {
   "Nguyen": "Win",
@@ -168,11 +173,6 @@
 </div>
 
 <script>
-    // ==========================================
-    // ⚠️ CONFIGURATION: PASTE API KEY HERE ⚠️
-    // ==========================================
-    const HARDCODED_KEY = ""; // Example: "sk-proj-12345..."
-    
     // --- STATE ---
     let appData = [];
     let audioCache = {};
@@ -186,6 +186,8 @@
 
     // --- INITIALIZATION ---
     window.onload = () => {
+        // Restore API Key & Preferences from Local Browser Storage
+        if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
         loadTemplateUI();
         
@@ -198,6 +200,7 @@
     };
 
     function saveConfig() {
+        localStorage.setItem('openai_key', document.getElementById('apiKey').value);
         localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value);
     }
     function switchTab(tab) {
@@ -236,7 +239,7 @@
         }
     }
 
-    // --- PDF PARSING ENGINE (FIXED) ---
+    // --- PDF PARSING ENGINE ---
     async function handlePdfUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
@@ -252,19 +255,16 @@
             // Loop pages with UI updates
             for (let i = 1; i <= pdf.numPages; i++) {
                 setStatus(`Reading PDF Page ${i} of ${pdf.numPages}...`, "working");
-                // Small pause to let UI render the status text
                 await new Promise(r => setTimeout(r, 10)); 
 
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
                 
-                // Sort by Y (Top->Bottom)
                 const items = textContent.items.map(item => ({
                     str: item.str, x: item.transform[4], y: item.transform[5] 
                 }));
                 items.sort((a, b) => b.y - a.y);
                 
-                // Line grouping
                 let lines = [];
                 let currentLine = [];
                 let lastY = items[0]?.y || 0;
@@ -283,7 +283,6 @@
                     lines.push(currentLine.map(obj => obj.str).join(" "));
                 }
 
-                // Regex Logic
                 let currentHeat = null;
                 let ignoreSection = false;
 
@@ -294,7 +293,6 @@
                     if (line.includes("Alternates")) { ignoreSection = true; return; }
                     
                     if (currentHeat && !ignoreSection) {
-                        // Stevenson/Patriot Format Regex
                         const rowMatch = line.match(/^(.+?)\s+(\d{1,2})\s+\d{1,2}\s+(.+)\s+(\d+[:\.]\d{2})/);
                         if (rowMatch) {
                             parsedRows.push({
@@ -309,7 +307,6 @@
                 });
             }
 
-            // Output to raw data box
             let tsvOutput = "";
             parsedRows.forEach(r => { tsvOutput += `${r.heat}\t${r.lane}\t${r.team}\t${r.name}\t${r.time}\n`; });
             document.getElementById('dataInput').value = tsvOutput;
@@ -319,7 +316,7 @@
 
         } catch (e) {
             console.error(e);
-            setStatus("Error reading PDF. See console.", "working"); // Error color reused
+            setStatus("Error reading PDF. See console.", "working");
             alert("Could not parse PDF. Please try pasting raw text.");
         }
     }
@@ -353,8 +350,10 @@
 
     // --- AUDIO GENERATION ---
     async function generateAudio() {
-        const key = HARDCODED_KEY;
-        if(!key || key === "") { alert("Please add your API Key in the code (Line 283)."); return; }
+        // GET KEY FROM INPUT BOX
+        const key = document.getElementById('apiKey').value;
+        
+        if(!key || !key.startsWith('sk-')) { alert("Please enter a valid OpenAI API Key."); return; }
         
         parseData(); 
         if(appData.length === 0) return;
@@ -373,7 +372,6 @@
         for (let i = 0; i < appData.length; i++) {
             const item = appData[i];
             
-            // Skip generation if scratched (save money)
             if (item.scratched) continue;
 
             let text = "";
@@ -387,7 +385,6 @@
                     .replace(/{name}/g, item.name)
                     .replace(/{time}/g, item.time);
                 
-                // Fix Pronunciation
                 text = fixPronunciation(rawText);
             }
 
@@ -438,7 +435,6 @@
                 el.className = `swimmer-card ${item.scratched ? 'scratched' : ''}`;
                 el.id = item.id;
                 
-                // Button HTML
                 const btnText = item.scratched ? "UNDO" : "SCRATCH";
                 const btnClass = item.scratched ? "scratch-btn is-scratched" : "scratch-btn";
                 
@@ -454,7 +450,6 @@
                 `;
             }
             el.onclick = (e) => { 
-                // Don't select if clicking the scratch button
                 if(e.target.tagName === 'BUTTON') return;
                 currentIndex = index; highlightCurrent(); playCurrent(); 
             };
@@ -464,9 +459,9 @@
     }
 
     function toggleScratch(e, index) {
-        e.stopPropagation(); // Stop card click
+        e.stopPropagation(); 
         appData[index].scratched = !appData[index].scratched;
-        renderList(); // Re-render to show gray out
+        renderList(); 
     }
 
     function highlightCurrent() {
@@ -491,7 +486,6 @@
         }
     }
 
-    // --- SMART NAVIGATION ---
     document.addEventListener('keydown', (e) => {
         if (appData.length === 0) return;
         
@@ -500,24 +494,14 @@
         else if (e.code === 'ArrowDown') { 
             e.preventDefault(); 
             let next = currentIndex + 1;
-            // Skip Scratched Items
             while (next < appData.length && appData[next].scratched) { next++; }
-            
-            if (next < appData.length) { 
-                currentIndex = next; 
-                highlightCurrent(); 
-            }
+            if (next < appData.length) { currentIndex = next; highlightCurrent(); }
         } 
         else if (e.code === 'ArrowUp') { 
             e.preventDefault(); 
             let prev = currentIndex - 1;
-            // Skip Scratched Items Backwards
             while (prev >= 0 && appData[prev].scratched) { prev--; }
-            
-            if (prev >= 0) { 
-                currentIndex = prev; 
-                highlightCurrent(); 
-            }
+            if (prev >= 0) { currentIndex = prev; highlightCurrent(); }
         }
     });
 
