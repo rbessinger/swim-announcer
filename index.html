@@ -2,15 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v18 (Smart Headers)</title>
+    <title>Swim Announcer Ultimate v19 (Championship)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        .sidebar { width: 360px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        /* SIDEBAR */
+        .sidebar { width: 380px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
@@ -36,8 +38,9 @@
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
         input[type="file"] { display: none; }
 
+        /* 3-TAB SYSTEM */
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
-        .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
+        .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; }
         .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
 
         .action-area { padding: 20px; background: #020617; border-top: 1px solid #1e293b; }
@@ -49,7 +52,6 @@
         .btn-parse { background: #334155; color: white; border: none; padding: 8px; width: 100%; margin-top: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
         .btn-parse:hover { background: #475569; }
 
-        /* CHECKBOX */
         .checkbox-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .checkbox-row input { width: auto; accent-color: var(--accent); cursor: pointer; }
         .checkbox-row span { font-size: 0.8rem; color: #cbd5e1; }
@@ -105,7 +107,7 @@
         .btn-go:active { transform: scale(0.95); background: #15803d; }
         .go-label { font-size: 0.8rem; font-weight: normal; opacity: 0.8; margin-top: -5px; }
 
-        /* MODAL (SETTINGS) */
+        /* MODAL */
         .modal-overlay { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; 
@@ -154,12 +156,13 @@
             <div>
                 <label>2. Script Template</label>
                 <div class="template-tabs">
-                    <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
-                    <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
+                    <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">1. Heats</button>
+                    <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">2. Finalists</button>
+                    <button class="tab-btn" id="btnTab3" onclick="switchTab(3)">3. Results</button>
                 </div>
-                <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
+                <textarea id="templateInput" style="height:70px;" oninput="markDirty()"></textarea>
                 <div style="font-size:0.65rem; color:#64748b; margin-top:5px; line-height:1.4;">
-                    Vars: <span style="color:var(--accent)">{event} {event_name} {heat} {lane} {age} {team} {name} {time}</span>
+                    Vars: <span style="color:var(--accent)">{event} {event_name} {heat} {lane} {team} {name} {time}</span>
                 </div>
             </div>
 
@@ -236,7 +239,7 @@
     <div class="list-container" id="listContainer">
         <div style="text-align:center; color:#94a3b8; margin-top:100px;">
             <h3>Welcome to Heat Manager</h3>
-            <p>Upload a PDF or Image (Photo) to see heats.</p>
+            <p>Upload a PDF or Image to see heats.</p>
         </div>
     </div>
 
@@ -300,9 +303,20 @@
     }
 
     function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
-    const defaultTemplates = { 1: "In lane {lane}, representing {team}, {name}.", 2: "Winner in lane {lane}, {name}, with a time of {time}." };
+    
+    // --- 3 TEMPLATE DEFAULTS ---
+    const defaultTemplates = { 
+        1: "In lane {lane}, representing {team}, {name}.", 
+        2: "Qualifying for the finals in lane {lane}, representing {team}, {name}.",
+        3: "Finishing in lane {lane}, with a time of {time}, {name}."
+    };
     let currentTab = 1;
-    function switchTab(t) { currentTab=t; loadTemplateUI(); markDirty(); document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', i+1===t)); }
+    function switchTab(t) { 
+        currentTab=t; 
+        loadTemplateUI(); 
+        markDirty(); 
+        document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', i+1===t)); 
+    }
     function loadTemplateUI() { document.getElementById('templateInput').value = localStorage.getItem('t_'+currentTab) || defaultTemplates[currentTab]; }
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
     function setStatus(msg, type) { const el = document.getElementById('statusText'); el.innerText = msg; el.className = 'status '+type; }
@@ -327,7 +341,7 @@
         return text;
     }
 
-    // --- UPLOAD HANDLER (PDF + IMG) ---
+    // --- UPLOAD HANDLER ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
@@ -348,20 +362,15 @@
             const worker = await Tesseract.createWorker('eng');
             const ret = await worker.recognize(file);
             await worker.terminate();
-            
             document.getElementById('dataInput').value = ret.data.text;
             const count = manualParse(true);
-            
             if(count === 0) {
                 setStatus("OCR Failed to find swimmers. Check Settings -> Raw Data.", "error");
-                alert("I scanned the image but didn't see the usual swimmer format. Check the Raw Data in settings.");
+                alert("I scanned the image but didn't see the usual swimmer format.");
             } else {
                 setStatus(`Found ${count} swimmers from Image.`, "ready");
             }
-        } catch(e) {
-            console.error(e);
-            setStatus("OCR Error.", "error");
-        }
+        } catch(e) { console.error(e); setStatus("OCR Error.", "error"); }
     }
 
     async function handlePdf(file) {
@@ -389,14 +398,14 @@
             const count = manualParse(true); 
             if(count === 0) {
                 setStatus("Auto-parse failed. Check Settings -> Raw Data.", "error");
-                alert("I couldn't find any swimmers. Check the Raw Data box in Settings.");
+                alert("I couldn't find any swimmers.");
             } else {
                 setStatus(`Found ${count} swimmers.`, "ready");
             }
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER (v18 Smart Event Headers) ---
+    // --- PARSER (v19 Fixed Event Description) ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -415,23 +424,23 @@
             if(evtMatch) {
                 currentEvent = evtMatch[1];
                 let rawEvtName = evtMatch[2].trim();
-                // Clean common artifacts
+                // CLEAN: Remove quotes, commas, dashes at start
                 rawEvtName = rawEvtName.replace(/^[-–—]\s*/, "").replace(/["',]/g, "");
-                // Only use if it looks like a real name
                 if(rawEvtName.length > 3) currentEventName = rawEvtName;
             } 
-            // Case B: "Event 101" (Description on next line?)
+            // Case B: "Event 101" (Description on next line)
             else {
                 const shortEvt = line.match(/^"?Event\s+(\d+)"?,?$/i);
                 if(shortEvt) {
                     currentEvent = shortEvt[1];
-                    // Look Ahead to next line for description
+                    // LOOK AHEAD
                     if (i + 1 < lines.length) {
                         let nextLine = lines[i+1].trim();
-                        // Ignore if next line is "Heat..." or "Lane..."
+                        // Ignore if next line is Heat/Lane
                         if (!nextLine.match(/Heat\s+\d/i) && !nextLine.match(/Lane/i)) {
-                            // Strip quotes/commas e.g. ","Girls 50 Free"
-                            let cleanNext = nextLine.replace(/^",?"?/, "").replace(/",?$/, "");
+                            // Strip starting quotes/commas from CSV
+                            // e.g. "","Girls 50 Yard..."
+                            let cleanNext = nextLine.replace(/^"?,?"?/, "").replace(/",?$/, "");
                             if (cleanNext.length > 3) currentEventName = cleanNext;
                         }
                     }
@@ -483,7 +492,7 @@
         }
         
         if (parsedData.length === 0 && !silent) {
-            alert("Parser found 0 swimmers. Ensure format matches the layout.");
+            alert("Parser found 0 swimmers. Ensure format matches layout.");
             return 0;
         }
 
@@ -598,7 +607,6 @@
             const hId = `h_${heatKey}`;
             
             if (forceRegen || !audioCache[hId]) {
-                // Use event name if available, otherwise just group title
                 let introText = `Now swimming ${group.title}.`;
                 if(group.swimmers[0].eventName) {
                     introText = `Now swimming Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName}. Heat ${group.swimmers[0].heat}.`;
