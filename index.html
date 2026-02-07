@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v13 (Clean UI)</title>
+    <title>Swim Announcer Ultimate v14 (Modal Settings)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -17,12 +17,7 @@
         .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
         .settings-btn:hover { color: white; transform: rotate(90deg); }
 
-        .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; position: relative; }
-
-        /* VIEW TOGGLING */
-        .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
-        .view-section.active { display: flex; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
 
         label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; display: block; margin-bottom: 6px; color: #64748b; }
         input[type="text"], input[type="password"], textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
@@ -102,87 +97,76 @@
         .btn-go:active { transform: scale(0.95); background: #15803d; }
         .go-label { font-size: 0.8rem; font-weight: normal; opacity: 0.8; margin-top: -5px; }
 
+        /* MODAL (SETTINGS) */
+        .modal-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; 
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content { 
+            background: #0f172a; width: 500px; padding: 30px; border-radius: 12px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; 
+            color: #94a3b8; display: flex; flex-direction: column; gap: 20px;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .modal-title { font-size: 1.2rem; font-weight: bold; color: white; }
+        .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
+        .close-btn:hover { color: white; }
+
     </style>
 </head>
 <body>
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2 id="sidebarTitle">🏊 RUN SHOW</h2>
+        <h2>🏊 RUN SHOW</h2>
         <button class="settings-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
     </div>
     
     <div class="scroll-area">
         
-        <div id="viewMain" class="view-section active">
-            <div>
-                <label>1. Upload Meet Program</label>
-                <label class="file-upload-box">
-                    <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
-                    <div class="file-upload-text">Click to upload PDF</div>
-                    <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
-                </label>
-            </div>
-
-            <div>
-                <label>2. Script Template</label>
-                <div class="template-tabs">
-                    <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
-                    <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
-                </div>
-                <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
-            </div>
-
-            <div>
-                <label>3. Voice & Hype</label>
-                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
-                    <option value="nova">Nova (Energetic) 🔥</option>
-                    <option value="onyx">Onyx (Announcer) 🎙️</option>
-                    <option value="alloy">Alloy (Balanced)</option>
-                    <option value="echo">Echo (Soft)</option>
-                    <option value="shimmer">Shimmer (Clear)</option>
-                </select>
-
-                <div class="slider-group">
-                    <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
-                    <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
-                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
-                </div>
-            </div>
+        <div>
+            <label>1. Upload Meet Program</label>
+            <label class="file-upload-box">
+                <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
+                <div class="file-upload-text">Click to upload PDF</div>
+                <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
+            </label>
         </div>
 
-        <div id="viewSettings" class="view-section">
-            <div>
-                <label>OpenAI API Key</label>
-                <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
-                <div style="font-size:0.65rem; color:#64748b; margin-top:5px;">Key is saved to your browser cache.</div>
-            </div>
-            
-            <div>
-                <label>Name Format in PDF</label>
-                <select id="nameFormatSelect" onchange="manualParse()">
-                    <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
-                    <option value="first_last">First Last (e.g. Esmae Shen)</option>
-                </select>
-            </div>
-
-            <div>
-                <label>Phonetic Dictionary</label>
-                <textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()">
-{
-  "Nguyen": "Win",
-  "Gavrilos": "Gah-vree-los"
-}
-                </textarea>
-            </div>
-
-            <div>
-                <label style="color:var(--orange);">Raw Data (Debug)</label>
-                <textarea id="dataInput" style="height:100px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-                <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
-            </div>
+        <div>
+            <label>Name Format</label>
+            <select id="nameFormatSelect" onchange="manualParse()">
+                <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
+                <option value="first_last">First Last (e.g. Esmae Shen)</option>
+            </select>
         </div>
 
+        <div>
+            <label>2. Script Template</label>
+            <div class="template-tabs">
+                <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
+                <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
+            </div>
+            <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
+        </div>
+
+        <div>
+            <label>3. Voice & Hype</label>
+            <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
+                <option value="nova">Nova (Energetic) 🔥</option>
+                <option value="onyx">Onyx (Announcer) 🎙️</option>
+                <option value="alloy">Alloy (Balanced)</option>
+                <option value="echo">Echo (Soft)</option>
+                <option value="shimmer">Shimmer (Clear)</option>
+            </select>
+
+            <div class="slider-group">
+                <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
+                <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
+                <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
+            </div>
+        </div>
     </div>
 
     <div class="action-area">
@@ -221,12 +205,42 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="settingsModal" onclick="if(event.target===this) toggleSettings()">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">⚙️ SETTINGS</div>
+            <button class="close-btn" onclick="toggleSettings()">&times;</button>
+        </div>
+
+        <div>
+            <label>OpenAI API Key</label>
+            <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
+            <div style="font-size:0.65rem; color:#64748b; margin-top:5px;">Key is saved to your browser cache.</div>
+        </div>
+
+        <div>
+            <label>Phonetic Dictionary (JSON)</label>
+            <textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()">
+{
+  "Nguyen": "Win",
+  "Gavrilos": "Gah-vree-los"
+}
+            </textarea>
+        </div>
+
+        <div>
+            <label style="color:var(--orange);">Raw Data (Debug)</label>
+            <textarea id="dataInput" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
+            <button class="btn-parse" onclick="manualParse(); toggleSettings();">Force Parse Data</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let heats = {}; 
     let heatOrder = []; 
     let audioCache = {}; 
     let currentSelection = { heat: null, index: -1 }; 
-    let isSettingsOpen = false;
 
     window.onload = () => {
         if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
@@ -237,10 +251,8 @@
     };
 
     function toggleSettings() {
-        isSettingsOpen = !isSettingsOpen;
-        document.getElementById('viewMain').classList.toggle('active', !isSettingsOpen);
-        document.getElementById('viewSettings').classList.toggle('active', isSettingsOpen);
-        document.getElementById('sidebarTitle').innerText = isSettingsOpen ? "⚙️ SETTINGS" : "🏊 RUN SHOW";
+        const modal = document.getElementById('settingsModal');
+        modal.classList.toggle('active');
     }
 
     function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
@@ -456,7 +468,7 @@
 
     async function generateAudio() {
         const key = document.getElementById('apiKey').value;
-        if(!key.startsWith('sk-')) { alert("Missing API Key"); return; }
+        if(!key.startsWith('sk-')) { alert("Missing API Key"); toggleSettings(); return; }
         
         const btn = document.getElementById('btnGenerate');
         btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
@@ -496,7 +508,6 @@
     }
 
     async function fetchAI(text, voice, key) {
-        // DEFAULT SPEED 1.0 (Fixed to prevent "weird" audio)
         const r = await fetch("https://api.openai.com/v1/audio/speech", {
             method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
             body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: 1.0 })
