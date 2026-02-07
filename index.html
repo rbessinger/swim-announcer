@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v12 (Hype Edition)</title>
+    <title>Swim Announcer Ultimate v13 (Clean UI)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 
@@ -10,10 +10,19 @@
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
+        /* SIDEBAR */
         .sidebar { width: 360px; background: var(--primary); color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #334155; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
-        .sidebar-header { padding: 20px; background: #020617; border-bottom: 1px solid #1e293b; }
+        .sidebar-header { padding: 15px 20px; background: #020617; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.1rem; letter-spacing: 0.5px; }
-        .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        .settings-btn { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; transition: 0.2s; }
+        .settings-btn:hover { color: white; transform: rotate(90deg); }
+
+        .scroll-area { overflow-y: auto; flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; position: relative; }
+
+        /* VIEW TOGGLING */
+        .view-section { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.3s; }
+        .view-section.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; display: block; margin-bottom: 6px; color: #64748b; }
         input[type="text"], input[type="password"], textarea, select { width: 100%; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
@@ -99,82 +108,84 @@
 
 <div class="sidebar">
     <div class="sidebar-header">
-        <h2>🏊 Ultimate v12 (Hype)</h2>
+        <h2 id="sidebarTitle">🏊 RUN SHOW</h2>
+        <button class="settings-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
     </div>
     
     <div class="scroll-area">
-        <div>
-            <label>OpenAI API Key</label>
-            <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
-        </div>
-
-        <div>
-            <label>1. Upload Meet Program</label>
-            <label class="file-upload-box">
-                <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
-                <div class="file-upload-text">Click to upload PDF</div>
-                <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
-            </label>
-        </div>
         
-        <div>
-            <label>Name Format</label>
-            <select id="nameFormatSelect" onchange="manualParse()">
-                <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
-                <option value="first_last">First Last (e.g. Esmae Shen)</option>
-            </select>
-        </div>
+        <div id="viewMain" class="view-section active">
+            <div>
+                <label>1. Upload Meet Program</label>
+                <label class="file-upload-box">
+                    <span id="fileNameDisplay" style="font-size:1.5rem;">📄</span>
+                    <div class="file-upload-text">Click to upload PDF</div>
+                    <input type="file" id="pdfUpload" accept=".pdf" onchange="handlePdfUpload(this)">
+                </label>
+            </div>
 
-        <div>
-            <label>Voice Energy</label>
-            <div class="slider-group">
-                <label>Speed (Pacing) <span id="speedVal" class="slider-val">1.0x</span></label>
-                <input type="range" id="speedSlider" min="0.85" max="1.25" step="0.05" value="1.0" oninput="updateSliders()">
-                
-                <div style="margin-top:10px;"></div>
-                
-                <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
-                <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
-                <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
+            <div>
+                <label>2. Script Template</label>
+                <div class="template-tabs">
+                    <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
+                    <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
+                </div>
+                <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
+            </div>
+
+            <div>
+                <label>3. Voice & Hype</label>
+                <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
+                    <option value="nova">Nova (Energetic) 🔥</option>
+                    <option value="onyx">Onyx (Announcer) 🎙️</option>
+                    <option value="alloy">Alloy (Balanced)</option>
+                    <option value="echo">Echo (Soft)</option>
+                    <option value="shimmer">Shimmer (Clear)</option>
+                </select>
+
+                <div class="slider-group">
+                    <label>Hype Level <span id="hypeVal" class="slider-val">None</span></label>
+                    <input type="range" id="hypeSlider" min="0" max="2" step="1" value="0" oninput="updateSliders()">
+                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">0=Normal, 1=Excited, 2=Stadium!</div>
+                </div>
             </div>
         </div>
 
-        <div>
-            <label>2. Script Template</label>
-            <div class="template-tabs">
-                <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">Script A (Intro)</button>
-                <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">Script B (Result)</button>
+        <div id="viewSettings" class="view-section">
+            <div>
+                <label>OpenAI API Key</label>
+                <input type="password" id="apiKey" placeholder="sk-..." onchange="saveConfig()">
+                <div style="font-size:0.65rem; color:#64748b; margin-top:5px;">Key is saved to your browser cache.</div>
             </div>
-            <textarea id="templateInput" style="height:60px;" oninput="markDirty()">In lane {lane}, representing {team}, {name}.</textarea>
-        </div>
+            
+            <div>
+                <label>Name Format in PDF</label>
+                <select id="nameFormatSelect" onchange="manualParse()">
+                    <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
+                    <option value="first_last">First Last (e.g. Esmae Shen)</option>
+                </select>
+            </div>
 
-        <div>
-            <label>3. Phonetic Fixes</label>
-            <textarea id="dictInput" style="height:50px; font-size:0.75rem;" oninput="markDirty()">
+            <div>
+                <label>Phonetic Dictionary</label>
+                <textarea id="dictInput" style="height:100px; font-size:0.75rem;" oninput="markDirty()">
 {
   "Nguyen": "Win",
   "Gavrilos": "Gah-vree-los"
 }
-            </textarea>
+                </textarea>
+            </div>
+
+            <div>
+                <label style="color:var(--orange);">Raw Data (Debug)</label>
+                <textarea id="dataInput" style="height:100px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
+                <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
+            </div>
         </div>
-        
-        <div>
-            <label style="color:var(--orange);">⚠️ RAW DATA</label>
-            <textarea id="dataInput" style="height:80px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea>
-            <button class="btn-parse" onclick="manualParse()">Force Parse Data</button>
-        </div>
+
     </div>
 
     <div class="action-area">
-        <label style="color:white; margin-bottom:5px;">Voice Personality</label>
-        <select id="voiceSelect" onchange="saveConfig()" style="margin-bottom:10px;">
-            <option value="nova">Nova (Energetic/Hype) 🔥</option>
-            <option value="onyx">Onyx (Deep/Announcer) 🎙️</option>
-            <option value="alloy">Alloy (Balanced)</option>
-            <option value="echo">Echo (Soft)</option>
-            <option value="shimmer">Shimmer (Clear)</option>
-        </select>
-        
         <button id="btnGenerate" class="btn-gen" onclick="generateAudio()">
             <span>⚡ GENERATE AUDIO</span>
         </button>
@@ -215,7 +226,8 @@
     let heatOrder = []; 
     let audioCache = {}; 
     let currentSelection = { heat: null, index: -1 }; 
-    
+    let isSettingsOpen = false;
+
     window.onload = () => {
         if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
         if(localStorage.getItem('voice_pref')) document.getElementById('voiceSelect').value = localStorage.getItem('voice_pref');
@@ -223,6 +235,13 @@
         updateSliders();
         document.addEventListener('click', async () => { if ('wakeLock' in navigator && !window.wakeLockObj) { try { window.wakeLockObj = await navigator.wakeLock.request('screen'); } catch(e){} } }, {once: true});
     };
+
+    function toggleSettings() {
+        isSettingsOpen = !isSettingsOpen;
+        document.getElementById('viewMain').classList.toggle('active', !isSettingsOpen);
+        document.getElementById('viewSettings').classList.toggle('active', isSettingsOpen);
+        document.getElementById('sidebarTitle').innerText = isSettingsOpen ? "⚙️ SETTINGS" : "🏊 RUN SHOW";
+    }
 
     function saveConfig() { localStorage.setItem('openai_key', document.getElementById('apiKey').value); localStorage.setItem('voice_pref', document.getElementById('voiceSelect').value); }
     const defaultTemplates = { 1: "In lane {lane}, representing {team}, {name}.", 2: "Winner in lane {lane}, {name}, with a time of {time}." };
@@ -232,41 +251,26 @@
     function markDirty() { const btn = document.getElementById('btnGenerate'); btn.classList.add('dirty'); btn.innerHTML = "<span>⚠️ RE-GENERATE NEEDED</span>"; }
     function setStatus(msg, type) { const el = document.getElementById('statusText'); el.innerText = msg; el.className = 'status '+type; }
 
-    // --- SLIDERS ---
     function updateSliders() {
-        const speed = document.getElementById('speedSlider').value;
-        document.getElementById('speedVal').innerText = speed + "x";
-        
         const hype = document.getElementById('hypeSlider').value;
         const labels = ["None", "Excited", "Stadium!"];
         document.getElementById('hypeVal').innerText = labels[hype];
         markDirty();
     }
 
-    // --- HYPE PROCESSOR ---
     function applyHype(text) {
         const hype = parseInt(document.getElementById('hypeSlider').value);
-        if (hype === 0) return text; // Normal
-
-        if (hype === 1) {
-            // Excited: Add exclamation points
-            return text.replace(/\./g, "!") + "!";
-        }
-
+        if (hype === 0) return text;
+        if (hype === 1) return text.replace(/\./g, "!") + "!";
         if (hype === 2) {
-            // Stadium: ALL CAPS + pauses + exclamation
-            // 1. Force Upper Case
             let hText = text.toUpperCase();
-            // 2. Add dramatic pauses
             hText = hText.replace(/LANE (\d+)/g, "LANE... $1");
             hText = hText.replace(/REPRESENTING/g, "REPRESENTING...");
-            // 3. Max punctuation
             return hText.replace(/\./g, "!!!") + "!!!";
         }
         return text;
     }
 
-    // --- PDF ENGINE ---
     async function handlePdfUpload(input) {
         if (!input.files[0]) return;
         setStatus("Reading PDF...", "working");
@@ -292,15 +296,14 @@
             document.getElementById('dataInput').value = fullText;
             const count = manualParse(true); 
             if(count === 0) {
-                setStatus("Auto-parse failed. Check Raw Data box.", "error");
-                alert("I couldn't find any swimmers. Check the Raw Data box.");
+                setStatus("Auto-parse failed. Check Settings -> Raw Data.", "error");
+                alert("I couldn't find any swimmers. Check the Raw Data box in Settings.");
             } else {
                 setStatus(`Found ${count} swimmers.`, "ready");
             }
         } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
     }
 
-    // --- PARSER ---
     function manualParse(silent = false) {
         const raw = document.getElementById('dataInput').value;
         const nameFormat = document.getElementById('nameFormatSelect').value; 
@@ -355,7 +358,7 @@
         });
         
         if (parsedData.length === 0 && !silent) {
-            alert("Parser found 0 swimmers. Ensure format matches the Stevenson HS layout.");
+            alert("Parser found 0 swimmers. Ensure format matches the layout.");
             return 0;
         }
 
@@ -375,7 +378,7 @@
         container.innerHTML = "";
         
         if (heatOrder.length === 0) {
-            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Check the Raw Data box on the left.</p></div>`;
+            container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF to begin.</p></div>`;
             return;
         }
         
@@ -461,7 +464,6 @@
         const template = document.getElementById('templateInput').value;
         const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
         const voice = document.getElementById('voiceSelect').value;
-        const speed = parseFloat(document.getElementById('speedSlider').value);
         
         audioCache = {}; 
         let total = 0; Object.values(heats).forEach(g => total += g.swimmers.length); let count = 0;
@@ -470,9 +472,8 @@
             const group = heats[heatKey];
             const hId = `h_${heatKey}`;
             
-            // Intro
             const introText = applyHype(`Now swimming ${group.title}.`);
-            try { const res = await fetchAI(introText, voice, speed, key); if(res) audioCache[hId] = res; } catch(e) {}
+            try { const res = await fetchAI(introText, voice, key); if(res) audioCache[hId] = res; } catch(e) {}
 
             for (const s of group.swimmers) {
                 if(s.scratched) continue;
@@ -486,20 +487,19 @@
                     .replace(/{time}/g, s.time);
 
                 for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                
                 txt = applyHype(txt);
-
-                try { const res = await fetchAI(txt, voice, speed, key); if(res) audioCache[s.id] = res; } catch(e) {}
+                try { const res = await fetchAI(txt, voice, key); if(res) audioCache[s.id] = res; } catch(e) {}
                 count++; document.getElementById('progressFill').style.width = (count/total*100)+"%";
             }
         }
         btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
-    async function fetchAI(text, voice, speed, key) {
+    async function fetchAI(text, voice, key) {
+        // DEFAULT SPEED 1.0 (Fixed to prevent "weird" audio)
         const r = await fetch("https://api.openai.com/v1/audio/speech", {
             method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: speed })
+            body: JSON.stringify({ model: "tts-1", input: text, voice: voice, speed: 1.0 })
         });
         if(r.ok) return new Audio(URL.createObjectURL(await r.blob()));
         return null;
