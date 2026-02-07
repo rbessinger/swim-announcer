@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Swim Announcer Ultimate v60 (Universal Parser)</title>
+    <title>Swim Announcer Ultimate v61 (Cleaner & Pronunciation)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        /* --- STABLE V44 LAYOUT --- */
+        /* --- STABLE V61 LAYOUT --- */
         :root { --primary: #0f172a; --accent: #3b82f6; --bg: #f8fafc; --text: #334155; --surface: #ffffff; --green: #10b981; --red: #ef4444; --orange: #f59e0b; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
@@ -33,11 +33,20 @@
         .slider-group { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px solid #334155; }
         .slider-val { float: right; color: var(--accent); font-family: monospace; }
 
-        .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; position: relative; }
+        .file-upload-box { border: 2px dashed #334155; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #1e293b; position: relative; overflow: hidden; }
         .file-upload-box:hover { border-color: var(--accent); }
         .file-upload-box.uploaded { border-color: var(--green); background: #064e3b; }
         .file-upload-text { font-size: 0.8rem; color: #94a3b8; margin-top: 5px; }
+        .file-icon { font-size: 1.5rem; }
         input[type="file"] { display: none; }
+
+        /* DEBUG CONSOLE */
+        .debug-console { 
+            background: #000; color: #00ff00; font-family: monospace; font-size: 0.7rem; 
+            padding: 10px; border-radius: 6px; height: 100px; overflow-y: auto; 
+            border: 1px solid #333; margin-bottom: 10px; display: none;
+        }
+        .debug-console.active { display: block; }
 
         .template-tabs { display: flex; gap: 5px; margin-bottom: 5px; }
         .tab-btn { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; transition: 0.2s; }
@@ -63,6 +72,14 @@
         .progress-bar { height: 4px; background: #334155; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
         .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.3s; }
 
+        .ai-toggle-box { background: #1e1b4b; border: 1px solid #4f46e5; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .ai-badge { background: linear-gradient(90deg, #4f46e5, #ec4899); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; margin-left: 5px; }
+
+        /* LOADING OVERLAY */
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--accent); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         /* MAIN DASHBOARD */
         .main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; position: relative; overflow: hidden; }
         .top-bar { padding: 15px 30px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); z-index: 1000; flex-shrink: 0; }
@@ -72,6 +89,12 @@
         .status.working { color: var(--accent); }
         .status.error { color: var(--red); }
         .status.stopped { color: var(--red); animation: none; }
+
+        .view-controls { display: flex; gap: 10px; background: #e2e8f0; padding: 4px; border-radius: 8px; }
+        .view-btn { border: none; background: none; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; color: #64748b; cursor: pointer; transition: 0.2s; }
+        .view-btn.active { background: white; color: var(--accent); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        .search-box { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; width: 200px; }
 
         .list-container { flex: 1; overflow-y: auto; padding: 30px; scroll-behavior: smooth; padding-bottom: 140px; }
         
@@ -89,6 +112,14 @@
         .swimmer-row.dragging { opacity: 0.5; background: #e2e8f0; border: 2px dashed #94a3b8; }
         .swimmer-row.scratched { background: #f8fafc; opacity: 0.6; }
         .swimmer-row.scratched .name-text { text-decoration: line-through; color: #94a3b8; }
+
+        .roster-row { display: flex; align-items: center; padding: 15px 20px; background: white; border: 1px solid #e2e8f0; margin-bottom: 10px; border-radius: 8px; transition: 0.1s; cursor: pointer; }
+        .roster-row:hover { border-color: var(--accent); background: #f8fafc; }
+        .roster-info { flex: 1; }
+        .roster-meta { font-size: 0.8rem; color: #94a3b8; margin-top: 3px; }
+        .play-icon { font-size: 1.5rem; color: #cbd5e1; transition: 0.2s; }
+        .roster-row:hover .play-icon { color: var(--green); transform: scale(1.1); }
+        .roster-row.no-audio .play-icon { color: #f1f5f9; }
 
         .col-lane { width: 50px; font-weight: 800; font-size: 1.2rem; color: #cbd5e1; text-align: center; cursor: grab; }
         .col-info { flex: 1; padding: 0 15px; }
@@ -144,6 +175,11 @@
 </head>
 <body>
 
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div id="loadingText" style="font-size:1.2rem; font-weight:bold;">Processing...</div>
+</div>
+
 <div class="sidebar">
     <div class="sidebar-header">
         <h2 id="sidebarTitle">🏊 RUN SHOW</h2>
@@ -153,6 +189,18 @@
     <div class="scroll-area">
         
         <div id="viewMain" class="view-section active">
+            <div class="ai-toggle-box">
+                <label class="checkbox-row" style="margin-bottom:0;">
+                    <input type="checkbox" id="useAiParser" onchange="toggleAiParser()">
+                    <span style="color:white; font-size:0.9rem;">Enable AI Parser <span class="ai-badge">SMART</span></span>
+                </label>
+                <div style="font-size:0.7rem; color:#94a3b8; margin-top:5px; margin-left:24px;">
+                    Uses OpenAI to read messy files. Slower but more accurate.
+                </div>
+            </div>
+
+            <div id="debugConsole" class="debug-console"></div>
+
             <div>
                 <label>1. Upload Meet Program</label>
                 <label class="file-upload-box" id="dropZone">
@@ -162,9 +210,9 @@
                 </label>
             </div>
 
-            <div>
+            <div id="manualFormatDiv">
                 <label>Name Format</label>
-                <select id="nameFormatSelect" onchange="manualParse()">
+                <select id="nameFormatSelect" onchange="streamParse()">
                     <option value="last_first">Last, First (e.g. Shen, Esmae)</option>
                     <option value="first_last">First Last (e.g. Esmae Shen)</option>
                 </select>
@@ -233,17 +281,17 @@
 
 <div class="main">
     <div class="top-bar">
-        <div>
-            <span style="font-weight: bold;">Status:</span> 
-            <span id="statusText" class="status">Waiting for PDF...</span>
+        <div class="view-controls">
+            <button class="view-btn active" id="viewHeatsBtn" onclick="switchView('heats')">Heats</button>
+            <button class="view-btn" id="viewRosterBtn" onclick="switchView('roster')">Roster</button>
         </div>
+        
+        <input type="text" id="rosterSearch" class="search-box" placeholder="Search Swimmers..." oninput="renderRoster()" style="display:none;">
+
         <div style="display:flex; align-items:center; gap:20px;">
             <button class="btn-stop-main" onclick="stopPlayback()">
                 🛑 STOP <span style="font-size:0.7rem; opacity:0.8;">(Esc)</span>
             </button>
-            <div style="font-size: 0.85rem; color: #64748b;">
-                <b>Spacebar:</b> GO &nbsp;|&nbsp; <b>Click:</b> Edit &nbsp;|&nbsp; <b>Drag:</b> Move Lane
-            </div>
         </div>
     </div>
 
@@ -266,7 +314,7 @@
         <div><label>ElevenLabs API Key</label><input type="password" id="elevenKeyModal" placeholder="xi-..." onchange="saveConfigFromModal()"></div>
         <div><label>Phonetic Dictionary (JSON)</label><textarea id="dictInputModal" style="height:150px; font-size:0.75rem;" onchange="saveDictFromModal()"></textarea></div>
         <div><label style="color:var(--orange);">Raw Data (Debug)</label><textarea id="dataInputModal" style="height:120px; font-size:0.7rem; font-family:monospace; white-space:pre; overflow:auto;" placeholder="Raw PDF text..."></textarea><button class="btn-parse" onclick="manualParseFromModal(); toggleSettings();">Force Parse Data</button></div>
-        <div class="version-tag">v60.0 (Universal Parser)</div>
+        <div class="version-tag">v61.0 (Cleaner & Pronunciation)</div>
     </div>
 </div>
 
@@ -305,8 +353,10 @@
     let heats = {}; let heatOrder = []; let audioCache = {}; let currentSelection = { heat: null, index: -1 }; 
     let isSettingsOpen = false; let isScriptOpen = false;
     let currentAudioObject = null;
+    let viewMode = 'heats'; 
+    let progressInterval;
+    let loadTimeout;
 
-    // --- PHONETIC MEGA PACK ---
     const MEGA_DICT = {
         "Nguyen": "Win", "Xu": "Shoo", "Zhang": "Jang", "Wang": "Wong", "Liu": "Leo", "Chen": "Chen", "Yang": "Young", "Huang": "Hwong", "Zhao": "Jow", "Wu": "Woo", "Zhou": "Joe", "Muller": "Mew-ler", "Schmidt": "Schmitt", "Schneider": "Sh-nye-der", "Fischer": "Fisher", "Weber": "Vey-ber", "Meyer": "My-er", "Wagner": "Vog-ner", "Becker": "Beck-er", "Schulz": "Shults", "Hoffmann": "Hoff-man", "Ivanov": "Ee-van-off", "Smirnov": "Smeer-noff", "Kuznetsov": "Kooz-net-soff", "Popov": "Pop-off", "Sokolov": "So-ko-loff", "Lebedev": "Leb-e-dev", "Kozlov": "Koz-loff", "Novikov": "No-vi-koff", "Morozov": "More-o-zoff", "Kowalski": "Ko-val-ski", "Wisniewski": "Vis-nyev-ski", "Wojcik": "Voy-chick", "Kowalczyk": "Ko-val-chick", "Kaminski": "Ka-min-ski", "Lewandowski": "Lev-an-dow-ski", "Zielinski": "Ziel-in-ski", "Szymanski": "Shim-an-ski", "Dabrowski": "Dab-row-ski", "Jankovic": "Yan-ko-vich", "Petrovic": "Pet-ro-vich", "Nikolic": "Nee-ko-lich", "Markovic": "Mar-ko-vich", "Djordjevic": "Jor-jay-vich", "Stojanovic": "Stoy-ya-no-vich", "Ilic": "Ee-lich", "Pavlovic": "Pav-lo-vich", "Gavrilos": "Gah-vree-los"
     };
@@ -316,35 +366,104 @@
         return str.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
     }
 
+    // --- DATA CLEANING ---
+    function cleanName(rawName) {
+        if(!rawName) return "";
+        // Remove middle initial (e.g. "Arjun S Shinde" -> "Arjun Shinde")
+        return rawName.replace(/(\s+[A-Z]\.?\s+)/g, " ").replace(/\s\s+/g, " ").trim();
+    }
+
+    function cleanTeam(rawTeam) {
+        if(!rawTeam) return "";
+        // Remove "-IL" suffix (e.g. "PAC-IL" -> "PAC")
+        return rawTeam.replace(/-[A-Z]{2}$/i, "").trim();
+    }
+
+    function getSpelledOutTeam(team) {
+        // If team name is strictly 3 letters (e.g. PAC), spell it out
+        if(/^[A-Z]{3}$/.test(team)) {
+            return team.split('').join(' ');
+        }
+        return team;
+    }
+
+    function toggleAiParser() {
+        const useAi = document.getElementById('useAiParser').checked;
+        document.getElementById('manualFormatDiv').style.display = useAi ? 'none' : 'block';
+    }
+
+    // --- DEBUG & LOADING ---
+    function log(msg) {
+        const consoleEl = document.getElementById('debugConsole');
+        consoleEl.style.display = 'block';
+        consoleEl.innerHTML += `<div>${msg}</div>`;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+        console.log(msg);
+    }
+
+    function showLoading(text) {
+        document.getElementById('loadingOverlay').style.display = 'flex';
+        document.getElementById('loadingText').innerText = text;
+        
+        clearTimeout(loadTimeout);
+        loadTimeout = setTimeout(() => {
+            hideLoading();
+            alert("Error: Operation timed out. Check file or network.");
+            log("Error: Timeout triggered.");
+        }, 45000); 
+    }
+    
+    function hideLoading() {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        clearTimeout(loadTimeout);
+    }
+
+    function startFakeProgress() {
+        const bar = document.getElementById('progressFill');
+        const container = document.getElementById('progressBar');
+        container.style.display = 'block';
+        bar.style.width = '0%';
+        bar.style.backgroundColor = 'var(--green)';
+        let width = 0;
+        clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+            if(width >= 90) clearInterval(progressInterval); 
+            else { width += 5; if(width > 50) width += 1; bar.style.width = width + '%'; }
+        }, 500);
+    }
+
+    function stopFakeProgress(success) {
+        clearInterval(progressInterval);
+        const bar = document.getElementById('progressFill');
+        if(success) {
+            bar.style.width = '100%';
+            setTimeout(() => { document.getElementById('progressBar').style.display = 'none'; }, 500);
+        } else {
+            bar.style.backgroundColor = '#ef4444'; 
+            setTimeout(() => { 
+                document.getElementById('progressBar').style.display = 'none'; 
+                bar.style.width = '0%'; 
+                bar.style.backgroundColor = 'var(--green)';
+            }, 2000);
+        }
+    }
+
     function setUploadState(fileName) {
         const box = document.getElementById('dropZone');
         const txt = document.getElementById('fileNameDisplay');
         const sub = document.getElementById('fileUploadText');
-        
         if(fileName) {
-            box.classList.add('uploaded');
-            txt.innerText = "✅";
-            sub.innerText = fileName;
-            sub.style.color = "#86efac";
-            sub.style.fontWeight = "bold";
+            box.classList.add('uploaded'); txt.innerText = "✅"; sub.innerText = fileName;
+            sub.style.color = "#86efac"; sub.style.fontWeight = "bold";
         } else {
-            box.classList.remove('uploaded');
-            txt.innerText = "📄 / 📷";
-            sub.innerText = "Drag PDF or Image (JPG/PNG)";
-            sub.style.color = "#94a3b8";
-            sub.style.fontWeight = "normal";
+            box.classList.remove('uploaded'); txt.innerText = "📄 / 📷"; sub.innerText = "Drag PDF or Image (JPG/PNG)";
+            sub.style.color = "#94a3b8"; sub.style.fontWeight = "normal";
         }
     }
 
     window.onload = () => {
-        if(localStorage.getItem('openai_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('openai_key');
-            document.getElementById('apiKeyModal').value = localStorage.getItem('openai_key');
-        }
-        if(localStorage.getItem('eleven_key')) {
-            document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
-            document.getElementById('elevenKeyModal').value = localStorage.getItem('eleven_key');
-        }
+        if(localStorage.getItem('openai_key')) document.getElementById('apiKey').value = localStorage.getItem('openai_key');
+        if(localStorage.getItem('eleven_key')) document.getElementById('elevenKey').value = localStorage.getItem('eleven_key');
         if(localStorage.getItem('custom_voice_id')) document.getElementById('customVoiceId').value = localStorage.getItem('custom_voice_id');
         
         const savedEngine = localStorage.getItem('engine_pref') || 'openai';
@@ -364,17 +483,10 @@
     };
 
     const VOICES_OPENAI = [
-        {id:'nova', name:'Nova (Energetic)'}, 
-        {id:'onyx', name:'Onyx (Announcer)'}, 
-        {id:'alloy', name:'Alloy (Balanced)'}, 
-        {id:'echo', name:'Echo (Soft)'}, 
-        {id:'shimmer', name:'Shimmer (Clear)'}
+        {id:'nova', name:'Nova (Energetic)'}, {id:'onyx', name:'Onyx (Announcer)'}, {id:'alloy', name:'Alloy (Balanced)'}, {id:'echo', name:'Echo (Soft)'}, {id:'shimmer', name:'Shimmer (Clear)'}
     ];
     const VOICES_ELEVEN = [
-        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'},
-        {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, 
-        {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'},
-        {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
+        {id:'JBFqnCBsd6RMkjVDRZzb', name:'George (Classic Announcer)'}, {id:'bVMeCyTHy58xNoL34h3p', name:'Jeremy (Deep American)'}, {id:'pFZP5JQG7iQjIQuC4Bku', name:'Lily (British Narrator)'}, {id:'XrExE9yKIg1WjnnlVkGX', name:'Matilda (Smooth)'}
     ];
 
     function updateVoiceOptions() {
@@ -382,23 +494,11 @@
         const select = document.getElementById('voiceSelect');
         const customDiv = document.getElementById('customVoiceDiv');
         select.innerHTML = "";
-        
         customDiv.style.display = (engine === 'elevenlabs') ? 'block' : 'none';
-
         let list = (engine === 'openai') ? VOICES_OPENAI : VOICES_ELEVEN;
-        
-        list.forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = v.id;
-            opt.innerText = v.name;
-            select.appendChild(opt);
-        });
-        
+        list.forEach(v => { const opt = document.createElement('option'); opt.value = v.id; opt.innerText = v.name; select.appendChild(opt); });
         const savedVoice = localStorage.getItem('voice_id_pref');
-        if(savedVoice) {
-            const exists = list.find(v => v.id === savedVoice);
-            if(exists) select.value = savedVoice;
-        }
+        if(savedVoice) { const exists = list.find(v => v.id === savedVoice); if(exists) select.value = savedVoice; }
         localStorage.setItem('engine_pref', engine);
     }
 
@@ -411,7 +511,7 @@
         try {
             heats = JSON.parse(localStorage.getItem('saved_heats'));
             heatOrder = JSON.parse(localStorage.getItem('saved_order'));
-            if(heats && heatOrder) { renderBoard(); setStatus("Restored previous session.", "ready"); }
+            if(heats && heatOrder) switchView('heats');
         } catch(e) { console.error(e); }
         loadTemplateUI();
     }
@@ -497,18 +597,19 @@
         return text;
     }
 
-    // --- FILE HANDLING ---
     async function handleFileUpload(input) {
         if (!input.files[0]) return;
         const file = input.files[0];
-        setUploadState(file.name);
+        setUploadState(file.name); 
 
         if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
             alert("⚠️ iPhone HEIC photos are not supported. Please convert to JPG.");
             input.value = ''; setUploadState(null); return;
         }
-
+        
+        showLoading("Reading File...");
         setStatus("Processing File...", "working");
+        document.getElementById('debugConsole').innerHTML = ""; 
         
         setTimeout(async () => {
             try {
@@ -517,6 +618,7 @@
                 else alert("Please upload PDF, JPG, or PNG.");
             } catch(e) {
                 console.error(e);
+                hideLoading();
                 setStatus("Upload Failed.", "error");
                 setUploadState(null);
                 alert("File Error: " + e.message);
@@ -535,7 +637,6 @@
                     canvas.width = img.width;
                     canvas.height = img.height;
                     ctx.drawImage(img, 0, 0);
-                    // Simple binarization/contrast
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imgData.data;
                     for (let i = 0; i < data.length; i += 4) {
@@ -552,27 +653,25 @@
     }
 
     async function handleImage(file) {
-        setStatus("Optimizing Image...", "working");
+        log("Image detected. Pre-processing...");
         try {
             const cleanDataUrl = await processImage(file);
-            setStatus("Scanning Text...", "working");
-            
+            log("Scanning Text (OCR)...");
             const worker = await Tesseract.createWorker('eng', 1);
             const ret = await worker.recognize(cleanDataUrl);
             await worker.terminate();
             
-            // Clean smart quotes and commas that break parsing
-            let cleanText = ret.data.text.replace(/["“”]/g, "").replace(/,\s?/g, " ");
+            // CLEAN INPUT (Strip Quotes)
+            const cleanText = ret.data.text.replace(/"/g, '').replace(/,/g, ' ');
             document.getElementById('dataInput').value = cleanText;
             
-            const count = manualParse(true);
-            if(count === 0) { 
-                setStatus("Found 0 swimmers. Check image rotation.", "error"); 
-                alert("OCR finished, but no swimmers found.\n\nTips:\n1. Ensure photo is VERTICAL.\n2. Crop to just the list."); 
-            } else {
-                setStatus(`Found ${count} swimmers.`, "ready");
-            }
+            log("Text extracted. Starting Stream Parse...");
+            
+            if(document.getElementById('useAiParser').checked) await parseWithAI(ret.data.text);
+            else streamParse(); 
+
         } catch(e) { 
+            hideLoading();
             console.error(e); 
             setStatus("OCR Error.", "error"); 
             alert("Photo Error: " + e.message); 
@@ -580,20 +679,22 @@
     }
 
     async function handlePdf(file) {
-        setStatus("Reading PDF...", "working");
+        log("PDF detected. Initializing Reader...");
         try {
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            log(`Found ${pdf.numPages} pages.`);
             let fullText = "";
+            
             for (let i = 1; i <= pdf.numPages; i++) {
+                setStatus(`Reading PDF Page ${i} of ${pdf.numPages}...`, "working");
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                // Looser sort tolerance to keep names together
                 const items = textContent.items.map(d => ({ str: d.str, x: d.transform[4], y: d.transform[5] })).sort((a,b) => b.y - a.y);
                 
                 let lines = [], currentLine = [], lastY = items[0]?.y || 0;
                 items.forEach(d => {
-                    if (Math.abs(d.y - lastY) > 8) { // Tolerance
+                    if (Math.abs(d.y - lastY) > 10) { 
                         lines.push(currentLine.sort((a,b)=>a.x-b.x).map(o=>o.str).join(" "));
                         currentLine = []; lastY = d.y;
                     }
@@ -603,94 +704,132 @@
                 fullText += lines.join("\n") + "\n";
             }
             
-            // Clean smart quotes/commas from PDF text
-            let cleanText = fullText.replace(/["“”]/g, "").replace(/,\s?/g, " ");
+            if(!fullText.trim()) {
+                hideLoading();
+                alert("This PDF has no text! It might be a scanned image.");
+                setStatus("PDF Error: No text found.", "error");
+                return;
+            }
+
+            // CLEAN INPUT (Strip Quotes)
+            const cleanText = fullText.replace(/"/g, '').replace(/,/g, ' ');
             document.getElementById('dataInput').value = cleanText;
             
-            const count = manualParse(true); 
-            if(count === 0) { setStatus("No swimmers found.", "error"); alert("No swimmers found."); }
-            else setStatus(`Found ${count} swimmers.`, "ready");
-        } catch(e) { console.error(e); alert("PDF Error: " + e.message); }
+            log(`Extracted ${fullText.length} characters.`);
+            log("Starting Stream Parse...");
+            
+            if(document.getElementById('useAiParser').checked) await parseWithAI(cleanText);
+            else streamParse();
+
+        } catch(e) { 
+            hideLoading();
+            console.error(e); 
+            alert("PDF Error: " + e.message); 
+        }
     }
 
-    // --- UNIVERSAL PARSER v60 ---
-    function manualParse(silent = false) {
+    // --- STREAM PARSER (V61 - Cleaner) ---
+    function streamParse() {
         try {
             const raw = document.getElementById('dataInput').value;
-            const nameFormat = document.getElementById('nameFormatSelect').value; 
             const lines = raw.split('\n');
             let parsedData = [];
             let currentEvent = "Unknown", currentEventName = "", currentHeat = null;
+            let pendingLane = null;
+            let pendingName = null;
+
+            log(`Parsing ${lines.length} raw lines...`);
 
             for(let i=0; i<lines.length; i++) {
                 let line = lines[i].trim();
-                if(line.length < 3) continue;
+                if(line.length < 1) continue;
 
-                // 1. EVENT HEADER
+                // 1. EVENT DETECTION
                 const evtMatch = line.match(/(?:Event|Evt)\s*(\d+)\s+(.*)/i);
                 if(evtMatch) {
                     currentEvent = evtMatch[1];
-                    // V60: Stop cleaning if we hit a digit (Time/Age) to prevent "Event 5 ... 1 Annie Ma" mashing
-                    let cleanName = evtMatch[2].split(/\s\d/)[0]
-                        .replace(/^[-–—]\s*/, "").replace(/Heat.*/i, "").trim();
-                    if (cleanName.length > 3) currentEventName = cleanName;
+                    // Clean Title: stop at digits/Heat
+                    let cleanTitle = evtMatch[2]
+                        .replace(/Heat.*/i, "")
+                        .replace(/(\d{1,2}:\d{2}\.\d{2}).*/, "") // Remove times
+                        .trim();
+                    if(cleanTitle.length > 3) currentEventName = cleanTitle;
+                    
                     currentHeat = null;
-                    continue; 
-                } 
-
-                // 2. HEAT HEADER
-                const hMatch = line.match(/Heat\s+(\d+)/i);
-                if(hMatch) {
-                    currentHeat = hMatch[1];
+                    pendingLane = null; 
                     continue;
                 }
 
-                // 3. SWIMMER ROW (Universal Regex)
-                // Looks for: Number (Lane/Place) + Name + Age + Team + Time
-                // Matches "1 Annie Ma 9 PAC-IL NT" or "1 Smith, John 12..."
-                let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+[a-z]?)($|\s)/);
-                
-                // Backup for Result Mode (Place... Time)
-                if(!m) m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+.*(XNT|NT|nt|[:\d\.]+[a-z]?)$/);
+                // 2. HEAT DETECTION
+                let hMatch = line.match(/Heat\s+(\d+)/i);
+                if (line.toLowerCase() === "heat" && i+1 < lines.length) {
+                    const nextLine = lines[i+1].trim();
+                    const multiMatch = nextLine.match(/^(\d+)\s+of/i);
+                    if(multiMatch) hMatch = multiMatch;
+                }
 
-                if(m) {
-                    let rawName = m[2].trim();
-                    // V60 Safety: If name contains "Heat", it's a false positive
-                    if(rawName.toLowerCase().includes("heat")) continue;
+                if(hMatch) {
+                    currentHeat = hMatch[1];
+                    pendingLane = null; 
+                    continue;
+                }
 
-                    if(!currentHeat) currentHeat = "1";
+                // 3. SWIMMER DETECTION
+                // Basic Line Match
+                if(line.match(/^\d{1,2}$/)) { pendingLane = line; continue; }
+                if(pendingLane && !pendingName && line.match(/^[A-Za-z \.-]+$/)) { pendingName = line; continue; }
 
-                    if (nameFormat === 'last_first' && rawName.includes(' ')) {
-                        // Attempt to flip if looks like Last First but no comma (PDF sanitization removed it)
-                        // If user selected "Last, First" but we stripped commas, we assume the first word is Last.
-                        // Actually, if commas are gone, it's ambiguous. Let's just trust the dropdown logic IF we see 2+ words.
-                        // Ideally, we keep the order found unless there was a comma originally. 
-                        // Simplified: Since we stripped commas, if nameFormat is last_first, we flip the first/last words.
-                        const parts = rawName.split(' ');
-                        if(parts.length >= 2) {
-                             // Heuristic: If we are in "Last, First" mode, assume first word is Surname
-                             // e.g. "Smith John" -> "John Smith"
-                             // Only do this if the user EXPLICITLY requested Last, First handling.
-                             let last = parts.shift();
-                             let first = parts.join(' ');
-                             rawName = `${first} ${last}`;
+                if(pendingLane && pendingName) {
+                    let atMatch = line.match(/^(\d{1,2})\s+(.+)/);
+                    if(atMatch) {
+                        let age = atMatch[1];
+                        let team = atMatch[2];
+                        let time = "NT";
+                        if(i+1 < lines.length) {
+                            let nextLine = lines[i+1].trim();
+                            if(nextLine.match(/[:\d\.]+|NT|XNT/)) { time = nextLine; i++; }
                         }
-                    }
 
+                        if(!currentHeat) currentHeat = "1";
+                        const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
+                        const displayTitle = `Event ${currentEvent} - Heat ${currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
+                        
+                        parsedData.push({ 
+                            heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
+                            heat: currentHeat, lane: pendingLane, place: pendingLane, 
+                            name: cleanName(pendingName), age: age, team: cleanTeam(team), time: time
+                        });
+
+                        pendingLane = null; pendingName = null;
+                        continue;
+                    }
+                }
+
+                // Standard One-Line
+                let m = line.match(/^\s*(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(.+?)\s+(XNT|NT|nt|[:\d\.]+)($|\s)/);
+                if(m) {
+                    if(!currentHeat) currentHeat = "1";
                     const uniqueHeatId = `E${currentEvent}-H${currentHeat}`;
                     const displayTitle = `Event ${currentEvent} - Heat ${currentHeat} ${currentEventName ? "("+currentEventName+")" : ""}`;
                     
                     parsedData.push({ 
                         heatId: uniqueHeatId, heatTitle: displayTitle, event: currentEvent, eventName: currentEventName, 
-                        heat: currentHeat, lane: m[1], place: m[1], name: rawName, age: m[3], team: m[4].trim(), 
-                        time: m[5].toUpperCase()
+                        heat: currentHeat, lane: m[1], place: m[1], 
+                        name: cleanName(m[2]), age: m[3], team: cleanTeam(m[4]), time: m[5]
                     });
+                    pendingLane = null; pendingName = null;
                 }
             }
-            
-            if (parsedData.length === 0) { if(!silent) alert("No swimmers found."); return 0; }
 
-            // Always overwrite on new upload for speed
+            hideLoading();
+            log(`Scan Complete. Found ${parsedData.length} swimmers.`);
+
+            if (parsedData.length === 0) { 
+                alert("No swimmers found. Check the Debug Console for details."); 
+                setUploadState(null); 
+                return 0; 
+            }
+
             heats = {}; heatOrder = [];
             parsedData.forEach(s => {
                 if(!heats[s.heatId]) { heats[s.heatId] = { title: s.heatTitle, swimmers: [] }; heatOrder.push(s.heatId); }
@@ -698,184 +837,192 @@
             });
             heatOrder.sort(); 
             saveSession();
-            renderBoard();
-            
-            return parsedData.length;
-        } catch(e) { console.error(e); if(!silent) alert("Parser Error: " + e.message); return 0; }
+            setStatus(`Loaded ${parsedData.length} swimmers.`, "ready");
+            switchView('heats'); 
+
+        } catch(e) { 
+            hideLoading();
+            console.error(e); 
+            alert("Parser Error: " + e.message); 
+        }
     }
 
-    function renderBoard() {
-        const container = document.getElementById('listContainer');
-        container.innerHTML = "";
-        if (heatOrder.length === 0) { container.innerHTML = `<div style="text-align:center; color:#94a3b8; margin-top:100px;"><h3>No Data Found</h3><p>Upload a PDF or Image to begin.</p></div>`; return; }
+    // --- AI PARSING ENGINE ---
+    async function parseWithAI(rawText) {
+        const key = cleanInput(document.getElementById('apiKey').value);
+        if(!key.startsWith('sk-')) { alert("AI Parser requires a valid OpenAI API Key."); return; }
         
-        heatOrder.forEach(heatKey => {
-            const group = heats[heatKey];
-            const swimmers = group.swimmers;
-            swimmers.sort((a,b) => parseInt(a.lane) - parseInt(b.lane));
+        startFakeProgress();
+        setStatus("🤖 Sending to AI (This takes ~10-20s)...", "working");
+        
+        const systemPrompt = `You are a data extractor for swimming heat sheets. 
+        Extract data into this JSON format:
+        [
+          {
+            "heatId": "E1-H1",
+            "heatTitle": "Event 1 - Heat 1 (Boys 50 Free)",
+            "event": "1",
+            "eventName": "Boys 50 Free",
+            "heat": "1",
+            "swimmers": [
+               { "lane": "4", "name": "John Doe", "team": "ACME", "age": "12", "time": "23.45" }
+            ]
+          }
+        ]
+        - Clean names (remove middle initials).
+        - Clean teams (remove state suffix like -IL).
+        - Group by Heats.
+        - Handle sideways text or messy OCR.
+        - 'XNT' and 'NT' are valid times.
+        - Ignore header junk.
+        - Return ONLY JSON.`;
 
-            const heatBlock = document.createElement('div');
-            heatBlock.className = 'heat-block';
-            
-            let headerText = group.title;
-            const header = document.createElement('div');
-            header.className = 'heat-header';
-            header.innerHTML = `<div class="heat-title">${headerText}</div> <div class="heat-badge">${swimmers.length} Swimmers</div>`;
-            header.onclick = () => selectCue(heatKey, -1);
-            if(currentSelection.heat === heatKey && currentSelection.index === -1) header.classList.add('active');
-            heatBlock.appendChild(header);
-
-            swimmers.forEach((s, idx) => {
-                const row = document.createElement('div');
-                row.className = `swimmer-row ${s.scratched ? 'scratched' : ''}`;
-                if(currentSelection.heat === heatKey && currentSelection.index === idx) row.classList.add('active');
-                if(audioCache[s.id]) row.classList.add('has-audio');
-                
-                row.draggable = true;
-                row.ondragstart = (e) => dragStart(e, heatKey, idx);
-                row.ondragover = (e) => e.preventDefault(); 
-                row.ondrop = (e) => drop(e, heatKey, idx);
-
-                row.innerHTML = `<div class="col-lane">${s.lane}</div><div class="col-info"><div class="name-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'name', this)">${s.name}</div><div class="team-text" contenteditable="true" onblur="updateData('${heatKey}', ${idx}, 'team', this)">${s.team}</div></div><div class="col-time">${s.time}</div><button class="btn-scratch ${s.scratched?'active':''}" onclick="toggleScratch('${heatKey}', ${idx})">X</button><div class="audio-dot"></div>`;
-                row.onclick = (e) => { if(!e.target.isContentEditable && e.target.tagName !== 'BUTTON') selectCue(heatKey, idx); };
-                heatBlock.appendChild(row);
+        try {
+            const r = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini", // Cheap and fast
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: rawText }
+                    ],
+                    temperature: 0
+                })
             });
             
-            const addBtn = document.createElement('button');
-            addBtn.className = 'btn-add-swimmer';
-            addBtn.innerText = "+ Add Swimmer";
-            addBtn.onclick = () => addSwimmer(heatKey);
-            heatBlock.appendChild(addBtn);
+            const json = await r.json();
+            if(json.error) throw new Error(json.error.message);
+            
+            let content = json.choices[0].message.content;
+            content = content.replace(/```json/g, "").replace(/```/g, "");
+            
+            const parsedData = JSON.parse(content);
+            
+            heats = {}; heatOrder = [];
+            parsedData.forEach(h => {
+                if(!heats[h.heatId]) { heats[h.heatId] = { title: h.heatTitle, swimmers: [] }; heatOrder.push(h.heatId); }
+                h.swimmers.forEach(s => {
+                    heats[h.heatId].swimmers.push({ 
+                        ...s, 
+                        heatId: h.heatId,
+                        event: h.event,
+                        eventName: h.eventName,
+                        heat: h.heat,
+                        scratched: false, 
+                        id: `s_${h.heatId}_${s.lane}` 
+                    });
+                });
+            });
+            
+            saveSession();
+            stopFakeProgress(true);
+            setStatus(`AI Found ${heatOrder.length} Heats.`, "ready");
+            switchView('heats');
 
-            container.appendChild(heatBlock);
-        });
-    }
-
-    function addSwimmer(heatKey) {
-        const s = { heatId: heatKey, event: "?", heat: "?", lane: "9", name: "New Swimmer", team: "Team", time: "NT", scratched: false, id: `s_${heatKey}_${Date.now()}` };
-        heats[heatKey].swimmers.push(s); saveSession(); renderBoard();
-    }
-
-    let dragSrc = null;
-    function dragStart(e, heat, index) { dragSrc = { heat, index }; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
-    function drop(e, targetHeat, targetIndex) {
-        e.preventDefault();
-        if(!dragSrc) return;
-        const srcList = heats[dragSrc.heat].swimmers;
-        const swimmer = srcList[dragSrc.index];
-        srcList.splice(dragSrc.index, 1);
-        const targetList = heats[targetHeat].swimmers;
-        swimmer.lane = targetList[targetIndex]?.lane || swimmer.lane; 
-        targetList.splice(targetIndex, 0, swimmer);
-        if(srcList.length === 0) delete heats[dragSrc.heat];
-        dragSrc = null; saveSession(); renderBoard();
-    }
-
-    function updateData(heat, idx, field, el) { heats[heat].swimmers[idx][field] = el.innerText; saveSession(); markDirty(); }
-    function toggleScratch(heat, idx) { heats[heat].swimmers[idx].scratched = !heats[heat].swimmers[idx].scratched; saveSession(); renderBoard(); }
-    function selectCue(heat, idx) { currentSelection = { heat, index: idx }; renderBoard(); }
-
-    function toggleScriptEditor() {
-        isScriptOpen = !isScriptOpen;
-        const modal = document.getElementById('scriptModal');
-        modal.classList.toggle('active', isScriptOpen);
-        if(isScriptOpen) { document.getElementById('modalTemplateInput').value = document.getElementById('templatePreview').value; document.getElementById('goBtnContainer').classList.add('disabled'); }
-        else { document.getElementById('goBtnContainer').classList.remove('disabled'); }
-    }
-
-    function syncScript() {
-        const bodyVal = document.getElementById('modalTemplateInput').value;
-        const introVal = document.getElementById('introScriptInput').value;
-        document.getElementById('templatePreview').value = bodyVal;
-        localStorage.setItem('t_'+currentTab, bodyVal);
-        localStorage.setItem('intro_'+currentTab, introVal);
-        markDirty();
-    }
-
-    function insertVar(text) {
-        let el = document.activeElement;
-        if(el.id !== 'modalTemplateInput' && el.id !== 'introScriptInput') el = document.getElementById('modalTemplateInput');
-        const start = el.selectionStart; const end = el.selectionEnd; const val = el.value;
-        el.value = val.substring(0, start) + text + val.substring(end);
-        el.selectionStart = el.selectionEnd = start + text.length; el.focus(); syncScript();
-    }
-
-    function getOrdinal(n) {
-        let s = ["th", "st", "nd", "rd"]; let v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        } catch(e) {
+            console.error(e);
+            stopFakeProgress(false);
+            alert("AI Parse Failed: " + e.message + "\n\nFalling back to manual parser.");
+            streamParse();
+        }
     }
 
     async function generateAudio() {
         const engine = document.getElementById('engineSelect').value;
         const oaKey = cleanInput(document.getElementById('apiKey').value);
         const xiKey = cleanInput(document.getElementById('elevenKey').value);
-        
-        // Custom Voice ID Logic
-        const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
-        let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
-
-        if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
-        if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
-
         const btn = document.getElementById('btnGenerate');
-        btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
-        const template = document.getElementById('modalTemplateInput').value; 
-        const introTemplate = document.getElementById('introScriptInput').value;
-        const dict = JSON.parse(document.getElementById('dictInput').value || "{}");
-        const voice = document.getElementById('voiceSelect').value;
-        const forceRegen = document.getElementById('forceRegen').checked;
-        const queue = [];
         
-        for (const heatKey of heatOrder) {
-            const group = heats[heatKey];
-            const hId = `h_${heatKey}`;
+        try {
+            const customVoiceId = cleanInput(document.getElementById('customVoiceId').value);
+            let voiceId = customVoiceId ? customVoiceId : document.getElementById('voiceSelect').value;
+
+            if (engine === 'openai' && !oaKey.startsWith('sk-')) { alert("Missing OpenAI Key. Check Settings."); toggleSettings(); return; }
+            if (engine === 'elevenlabs' && !xiKey) { alert("Missing ElevenLabs Key."); toggleSettings(); return; }
+
+            let dict = {};
+            try { dict = JSON.parse(document.getElementById('dictInput').value || "{}"); } 
+            catch(e) { alert("Dictionary Error: Invalid JSON."); return; }
+
+            btn.classList.remove('dirty'); btn.disabled = true; btn.innerText = "GENERATING...";
+            const template = document.getElementById('modalTemplateInput').value; 
+            const introTemplate = document.getElementById('introScriptInput').value;
+            const forceRegen = document.getElementById('forceRegen').checked;
+            const queue = [];
             
-            if (forceRegen || !audioCache[hId]) {
-                let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
-                introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
-                introText = applyHype(introText);
-                queue.push({ id: hId, text: introText });
-            }
-            for (const s of group.swimmers) {
-                if(s.scratched) continue;
-                if (forceRegen || !audioCache[s.id]) {
-                    let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
-                    let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
-                    let txt = template.replace(/{event_title}/g, sEventTitle).replace(/{event}/g, s.event).replace(/{event_name}/g, s.eventName).replace(/{heat}/g, s.heat).replace(/{lane}/g, s.lane).replace(/{place}/g, ordinalPlace).replace(/{age}/g, s.age).replace(/{team}/g, s.team).replace(/{name}/g, s.name).replace(/{time}/g, s.time);
-                    for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
-                    txt = applyHype(txt);
-                    queue.push({ id: s.id, text: txt });
+            for (const heatKey of heatOrder) {
+                const group = heats[heatKey];
+                if (!group.swimmers || group.swimmers.length === 0) continue;
+
+                const hId = `h_${heatKey}`;
+                
+                if (forceRegen || !audioCache[hId]) {
+                    let introText = introTemplate.replace(/{event_title}/g, `Event ${group.swimmers[0].event}, ${group.swimmers[0].eventName || ''}`);
+                    introText = introText.replace(/{event}/g, group.swimmers[0].event).replace(/{event_name}/g, group.swimmers[0].eventName).replace(/{heat}/g, group.swimmers[0].heat);
+                    introText = applyHype(introText);
+                    queue.push({ id: hId, text: introText });
+                }
+                for (const s of group.swimmers) {
+                    if(s.scratched) continue;
+                    if (forceRegen || !audioCache[s.id]) {
+                        
+                        // CLEAN TEAM FOR PRONUNCIATION
+                        let spokenTeam = getSpelledOutTeam(s.team);
+
+                        let sEventTitle = `Event ${s.event}, ${s.eventName}, Heat ${s.heat}`;
+                        let ordinalPlace = getOrdinal(parseInt(s.place) || s.place);
+                        let txt = template
+                            .replace(/{event_title}/g, sEventTitle)
+                            .replace(/{event}/g, s.event)
+                            .replace(/{event_name}/g, s.eventName)
+                            .replace(/{heat}/g, s.heat)
+                            .replace(/{lane}/g, s.lane)
+                            .replace(/{place}/g, ordinalPlace)
+                            .replace(/{age}/g, s.age)
+                            .replace(/{team}/g, spokenTeam) // Use the "P A C" version
+                            .replace(/{name}/g, s.name)
+                            .replace(/{time}/g, s.time);
+                        
+                        for (const [k,v] of Object.entries(dict)) txt = txt.replace(new RegExp(`\\b${k}\\b`,'gi'), v);
+                        txt = applyHype(txt);
+                        queue.push({ id: s.id, text: txt });
+                    }
                 }
             }
-        }
 
-        // --- TRAFFIC CONTROL ---
-        const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
-        
-        let completed = 0; const total = queue.length;
-        if (total === 0) { btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Nothing new to generate.", "ready"); return; }
-        setStatus(`Generating ${total} audio files (${engine === 'elevenlabs' ? 'Slow Mode' : 'Turbo Mode'})...`, "working");
+            const CONCURRENCY = (engine === 'elevenlabs') ? 1 : 5; 
+            let completed = 0; const total = queue.length;
+            if (total === 0) { setStatus("Nothing new to generate.", "ready"); return; }
+            
+            setStatus(`Generating ${total} audio files...`, "working");
 
-        async function worker() {
-            while (queue.length > 0) {
-                const task = queue.shift();
-                try {
-                    let res = null;
-                    if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
-                    else res = await fetchOpenAI(task.text, voice, oaKey);
-                    
-                    if(res) audioCache[task.id] = res;
-                } catch(e) { 
-                    console.error(e); 
-                    alert(`API Error: ${e.message}`);
+            async function worker() {
+                while (queue.length > 0) {
+                    const task = queue.shift();
+                    try {
+                        let res = null;
+                        if(engine === 'elevenlabs') res = await fetchEleven(task.text, voiceId, xiKey);
+                        else res = await fetchOpenAI(task.text, voiceId, oaKey);
+                        if(res) audioCache[task.id] = res;
+                    } catch(e) { console.error(e); alert(`API Error: ${e.message}`); }
+                    completed++;
+                    document.getElementById('progressFill').style.width = (completed/total*100)+"%";
                 }
-                completed++;
-                document.getElementById('progressFill').style.width = (completed/total*100)+"%";
             }
+            const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
+            await Promise.all(workers);
+            
+            setStatus("Audio Ready.", "ready");
+            if(viewMode === 'heats') renderBoard();
+            else renderRoster();
+
+        } catch (err) {
+            console.error(err);
+            alert("Crash Prevented: " + err.message);
+        } finally {
+            btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; 
         }
-        const workers = []; for(let i=0; i<CONCURRENCY; i++) workers.push(worker());
-        await Promise.all(workers);
-        btn.disabled = false; btn.innerText = "⚡ GENERATE AUDIO"; setStatus("Audio Ready.", "ready"); renderBoard();
     }
 
     async function fetchOpenAI(text, voice, key) {
